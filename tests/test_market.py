@@ -2,7 +2,7 @@ import random
 import unittest
 from unittest.mock import Mock
 
-from marketarena.market import (
+from environment.market import (
     MarketRound,
     VALID_DIRECTIONS,
     generate_market_round,
