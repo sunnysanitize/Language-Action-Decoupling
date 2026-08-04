@@ -41,3 +41,21 @@ On Windows:
 .venv\Scripts\Activate.ps1
 py -m marketarena.market
 ```
+
+## Run the tests
+
+The test suite uses Python's standard library and does not require extra packages.
+
+On macOS or Linux:
+
+```bash
+source .venv/bin/activate
+python -m unittest discover -v
+```
+
+On Windows:
+
+```powershell
+.venv\Scripts\Activate.ps1
+py -m unittest discover -v
+```
