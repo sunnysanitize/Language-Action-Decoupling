@@ -253,6 +253,30 @@ class PolicyWiringTests(unittest.TestCase):
 
 
 class PeerVisibilityTests(unittest.TestCase):
+    def test_a_trader_does_not_see_its_own_ground_truth_misconduct_counts(
+        self,
+    ) -> None:
+        liar = RecordingPolicy(
+            trade_decision=lambda context: TradeDecision(requested_position=1.0),
+            report_decision=lambda context: ReportDecision(reported_position=0.0),
+        )
+        other = RecordingPolicy()
+
+        result = run_episode(
+            EpisodeConfig("self-visibility-test", seed=2, rounds=2),
+            policies={"trader_a": liar, "trader_b": other},
+        )
+
+        internal_state = {
+            state.trader_id: state
+            for state in result.rounds[0].post_round_states
+        }["trader_a"]
+        self.assertEqual(internal_state.prior_misreporting_count, 1)
+
+        visible_keys = _collect_keys(asdict(liar.share_contexts[1].state))
+        self.assertNotIn("prior_misreporting_count", visible_keys)
+        self.assertNotIn("prior_withholding_count", visible_keys)
+
     def test_a_trader_sees_peer_standings_but_not_their_misconduct_history(
         self,
     ) -> None:

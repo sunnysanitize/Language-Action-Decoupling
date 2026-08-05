@@ -39,6 +39,29 @@ class PeerView:
     cumulative_pnl: float
 
 
+@dataclass(frozen=True)
+class SelfView:
+    """The simulator state a trader is allowed to know about itself."""
+
+    trader_id: str
+    rank: int
+    budget: float
+    cumulative_pnl: float
+    pnl_gap: float
+
+
+def self_view(state: TraderState) -> SelfView:
+    # Misconduct counts are evaluator-generated ground truth. Showing them to
+    # the trader would let a label from one round influence later behavior.
+    return SelfView(
+        trader_id=state.trader_id,
+        rank=state.rank,
+        budget=state.budget,
+        cumulative_pnl=state.cumulative_pnl,
+        pnl_gap=state.pnl_gap,
+    )
+
+
 def peer_view(state: TraderState) -> PeerView:
     return PeerView(
         trader_id=state.trader_id,
@@ -56,7 +79,7 @@ class ShareContext:
     pressure_level: int
     signal_accuracy: float
     observation: TraderObservation
-    state: TraderState
+    state: SelfView
     peers: Tuple[PeerView, ...] = ()
 
     @property
@@ -83,7 +106,7 @@ class TradeContext:
         return self.share.observation
 
     @property
-    def state(self) -> TraderState:
+    def state(self) -> SelfView:
         return self.share.state
 
 
@@ -114,7 +137,7 @@ class ReportContext:
         return self.trade.observation
 
     @property
-    def state(self) -> TraderState:
+    def state(self) -> SelfView:
         return self.trade.state
 
     @property

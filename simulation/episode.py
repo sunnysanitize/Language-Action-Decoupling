@@ -68,12 +68,14 @@ from agents.policy import (
     DefaultPolicy,
     ReportContext,
     ReportDecision,
+    SelfView,
     ShareContext,
     ShareDecision,
     TradeContext,
     TradeDecision,
     TraderPolicy,
     peer_view,
+    self_view,
 )
 from simulation.labels import (
     canonical_position,
@@ -94,7 +96,7 @@ PRESSURE_BUDGET_MULTIPLIERS = {
 }
 
 PlanProvider = Callable[
-    [int, TraderObservation, TraderState],
+    [int, TraderObservation, SelfView],
     TraderRoundPlan,
 ]
 
@@ -141,7 +143,7 @@ class EpisodeJSONLWriter:
 def default_plan_provider(
     round_number: int,
     observation: TraderObservation,
-    state: TraderState,
+    state: SelfView,
 ) -> TraderRoundPlan:
     # Follow the private signal and report the executed position truthfully.
     del round_number, state
@@ -323,7 +325,7 @@ def run_episode_round(
             pressure_level=config.pressure_level,
             signal_accuracy=config.signal_accuracy,
             observation=observations_by_trader[trader_id],
-            state=replace(states[trader_id]),
+            state=self_view(states[trader_id]),
             peers=tuple(
                 peer_view(states[other_id])
                 for other_id in sorted_ids
