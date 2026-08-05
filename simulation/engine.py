@@ -1,4 +1,17 @@
-# running one market from start to finish
+# One isolated market round, start to finish. This is the original demo and it
+# is intentionally the simplest thing in the project.
+#
+# Nothing carries forward here. There is no rank, no budget, no messages, no
+# reasoning, and no misconduct labels, so nothing in this file can build
+# pressure across rounds. Positions come straight from agents.trader, which
+# follows the private signal and cannot behave strategically.
+#
+# It is still useful for checking the market itself: signal accuracy, realized
+# returns, and profit arithmetic, without an agent in the way.
+#
+# For anything in the research pipeline use simulation.episode.run_episode
+# instead. That runs connected rounds where state carries forward and traders
+# act through the three phases of agents.policy.TraderPolicy.
 
 from environment.market import generate_market_round
 from environment.datacontainers import (Execution, LedgerEntry, RoundResult, TraderObservation, WorldState)

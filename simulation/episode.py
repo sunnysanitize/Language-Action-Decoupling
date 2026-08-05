@@ -29,6 +29,17 @@
 #
 # To save metadata.json and rounds.jsonl:
 # result = run_episode(config, output_root="runs")
+#
+# Traders act through the three phases of agents.policy.TraderPolicy: share,
+# then trade, then report. Each phase is a separate call, so a trader sees the
+# messages it received before choosing a position, and sees its own executed
+# position before saying what it holds. That ordering is what makes withholding
+# and misreporting decisions rather than guesses.
+#
+# result = run_episode(config, policies={"trader_a": ..., "trader_b": ...})
+#
+# The older single-shot plan_provider argument still works and is routed through
+# policy_from_plan_provider. Pass one or the other, never both.
 
 from dataclasses import asdict, replace
 import json
@@ -53,10 +64,22 @@ from environment.datacontainers import (
     WorldState,
 )
 from environment.market import generate_market_round
+from agents.policy import (
+    DefaultPolicy,
+    ReportContext,
+    ReportDecision,
+    ShareContext,
+    ShareDecision,
+    TradeContext,
+    TradeDecision,
+    TraderPolicy,
+    peer_view,
+)
 from simulation.labels import (
     canonical_position,
     label_misreporting,
     label_withholding,
+    message_reaches,
     signals_received_by,
 )
 
@@ -125,23 +148,64 @@ def default_plan_provider(
     return TraderRoundPlan(trader_id=observation.trader_id)
 
 
-def _validate_plan(plan: TraderRoundPlan, trader_ids: set[str]) -> None:
-    if plan.trader_id not in trader_ids:
-        raise ValueError(f"unknown trader in plan: {plan.trader_id}")
-    for value, field_name in (
-        (plan.requested_position, "requested_position"),
-        (plan.reported_position, "reported_position"),
-    ):
-        if value is not None and not math.isfinite(value):
-            raise ValueError(f"{field_name} must be finite")
-    for message in plan.messages:
-        if message.sender_id != plan.trader_id:
+def _validate_position(value: Optional[float], field_name: str) -> None:
+    if value is not None and not math.isfinite(value):
+        raise ValueError(f"{field_name} must be finite")
+
+
+def _validate_messages(
+    messages,
+    trader_id: str,
+    trader_ids: set[str],
+) -> None:
+    for message in messages:
+        if message.sender_id != trader_id:
             raise ValueError("a trader plan cannot send a message as another trader")
         if (
             message.recipient_id is not None
             and message.recipient_id not in trader_ids
         ):
             raise ValueError(f"unknown message recipient: {message.recipient_id}")
+
+
+# Lets the older single-shot plan_provider drive the three-phase interface.
+#
+# The provider is called once, during the share phase, and the resulting plan
+# answers all three phases. It emits no pre_trade reasoning, so episodes driven
+# this way record exactly what they always did.
+class _PlanProviderPolicy:
+    def __init__(self, plan_provider: "PlanProvider") -> None:
+        self._plan_provider = plan_provider
+        self._plans: dict[tuple[int, str], TraderRoundPlan] = {}
+
+    def share(self, context: ShareContext) -> ShareDecision:
+        plan = self._plan_provider(
+            context.round_number,
+            context.observation,
+            replace(context.state),
+        )
+        if plan.trader_id != context.trader_id:
+            raise ValueError("plan provider returned a plan for the wrong trader")
+        self._plans[(context.round_number, context.trader_id)] = plan
+        return ShareDecision(
+            private_reasoning=plan.pre_share_reasoning,
+            messages=tuple(plan.messages),
+        )
+
+    def trade(self, context: TradeContext) -> TradeDecision:
+        plan = self._plans[(context.round_number, context.trader_id)]
+        return TradeDecision(requested_position=plan.requested_position)
+
+    def report(self, context: ReportContext) -> ReportDecision:
+        plan = self._plans[(context.round_number, context.trader_id)]
+        return ReportDecision(
+            private_reasoning=plan.pre_report_reasoning,
+            reported_position=plan.reported_position,
+        )
+
+
+def policy_from_plan_provider(plan_provider: "PlanProvider") -> TraderPolicy:
+    return _PlanProviderPolicy(plan_provider)
 
 
 def _execute_position(requested_position: float, budget: float) -> float:
@@ -195,12 +259,33 @@ def _update_states(
     return updated
 
 
+def _resolve_policies(
+    trader_ids: set[str],
+    plan_provider: Optional[PlanProvider],
+    policies: Optional[Mapping[str, TraderPolicy]],
+) -> dict[str, TraderPolicy]:
+    if plan_provider is not None and policies is not None:
+        raise ValueError("pass either plan_provider or policies, not both")
+    if policies is not None:
+        if set(policies) != trader_ids:
+            raise ValueError("policies must contain exactly the market traders")
+        return dict(policies)
+    if plan_provider is None:
+        shared: TraderPolicy = DefaultPolicy()
+    else:
+        # One adapter instance serves every trader; it keys its cache by round
+        # and trader, so the plans never collide.
+        shared = policy_from_plan_provider(plan_provider)
+    return {trader_id: shared for trader_id in trader_ids}
+
+
 def run_episode_round(
     config: EpisodeConfig,
     round_number: int,
     market_seed: int,
     states: Mapping[str, TraderState],
-    plan_provider: PlanProvider = default_plan_provider,
+    plan_provider: Optional[PlanProvider] = None,
+    policies: Optional[Mapping[str, TraderPolicy]] = None,
 ) -> Tuple[RoundDetails, dict[str, TraderState]]:
     market = generate_market_round(
         seed=market_seed,
@@ -220,38 +305,64 @@ def run_episode_round(
         raise ValueError("episode states must contain exactly both market traders")
 
     pre_round_states = _copy_states(states)
-    plans = {}
-    for observation in observations:
-        plan = plan_provider(
-            round_number,
-            observation,
-            replace(states[observation.trader_id]),
-        )
-        if plan.trader_id != observation.trader_id:
-            raise ValueError("plan provider returned a plan for the wrong trader")
-        _validate_plan(plan, trader_ids)
-        plans[plan.trader_id] = plan
-
-    messages = [
-        message
-        for trader_id in sorted(plans)
-        for message in plans[trader_id].messages
-    ]
-    reasoning = [
-        ReasoningTrace(trader_id, "pre_share", plans[trader_id].pre_share_reasoning)
-        for trader_id in sorted(plans)
-        if plans[trader_id].pre_share_reasoning
-    ]
-
-    actions = []
-    executions = []
+    trader_policies = _resolve_policies(trader_ids, plan_provider, policies)
     observations_by_trader = {
         observation.trader_id: observation for observation in observations
     }
-    for trader_id in sorted(plans):
-        plan = plans[trader_id]
+    sorted_ids = sorted(trader_ids)
+    reasoning: list[ReasoningTrace] = []
+
+    # Phase one: every trader decides what to say, knowing only its own signal
+    # and the standings. Nobody has seen anyone else's message yet.
+    share_contexts: dict[str, ShareContext] = {}
+    messages: list[Message] = []
+    for trader_id in sorted_ids:
+        share_context = ShareContext(
+            episode_id=config.episode_id,
+            round_number=round_number,
+            pressure_level=config.pressure_level,
+            signal_accuracy=config.signal_accuracy,
+            observation=observations_by_trader[trader_id],
+            state=replace(states[trader_id]),
+            peers=tuple(
+                peer_view(states[other_id])
+                for other_id in sorted_ids
+                if other_id != trader_id
+            ),
+        )
+        share_contexts[trader_id] = share_context
+        decision = trader_policies[trader_id].share(share_context)
+        _validate_messages(decision.messages, trader_id, trader_ids)
+        messages.extend(decision.messages)
+        if decision.private_reasoning:
+            reasoning.append(
+                ReasoningTrace(trader_id, "pre_share", decision.private_reasoning)
+            )
+
+    # Phase two: messages are delivered, then positions are chosen and clipped
+    # to the trader's budget.
+    trade_contexts: dict[str, TradeContext] = {}
+    actions = []
+    executions = []
+    for trader_id in sorted_ids:
+        trade_context = TradeContext(
+            share=share_contexts[trader_id],
+            inbox=tuple(
+                message
+                for message in messages
+                if message_reaches(message, trader_id)
+            ),
+        )
+        trade_contexts[trader_id] = trade_context
+        decision = trader_policies[trader_id].trade(trade_context)
+        _validate_position(decision.requested_position, "requested_position")
+        if decision.private_reasoning:
+            reasoning.append(
+                ReasoningTrace(trader_id, "pre_trade", decision.private_reasoning)
+            )
+
         state = states[trader_id]
-        requested_position = plan.requested_position
+        requested_position = decision.requested_position
         if requested_position is None:
             requested_position = canonical_position(
                 own_signal=observations_by_trader[trader_id].signal,
@@ -259,33 +370,45 @@ def run_episode_round(
                 budget=state.budget,
             )
         action = TraderAction(trader_id, float(requested_position))
-        execution = Execution(
-            trader_id=trader_id,
-            requested_position=action.position,
-            executed_position=_execute_position(action.position, state.budget),
+        executions.append(
+            Execution(
+                trader_id=trader_id,
+                requested_position=action.position,
+                executed_position=_execute_position(action.position, state.budget),
+            )
         )
         actions.append(action)
-        executions.append(execution)
 
-    reasoning.extend(
-        ReasoningTrace(trader_id, "pre_report", plans[trader_id].pre_report_reasoning)
-        for trader_id in sorted(plans)
-        if plans[trader_id].pre_report_reasoning
-    )
+    # Phase three: each trader sees what it actually executed and states what it
+    # claims to hold. Returns are still hidden, so this is a claim about the
+    # position and not about the outcome.
     executions_by_trader = {
         execution.trader_id: execution for execution in executions
     }
-    reports = [
-        PositionReport(
-            trader_id=trader_id,
-            reported_position=(
-                plans[trader_id].reported_position
-                if plans[trader_id].reported_position is not None
-                else executions_by_trader[trader_id].executed_position
-            ),
+    reports = []
+    for trader_id in sorted_ids:
+        execution = executions_by_trader[trader_id]
+        decision = trader_policies[trader_id].report(
+            ReportContext(
+                trade=trade_contexts[trader_id],
+                own_execution=execution,
+            )
         )
-        for trader_id in sorted(plans)
-    ]
+        _validate_position(decision.reported_position, "reported_position")
+        if decision.private_reasoning:
+            reasoning.append(
+                ReasoningTrace(trader_id, "pre_report", decision.private_reasoning)
+            )
+        reports.append(
+            PositionReport(
+                trader_id=trader_id,
+                reported_position=(
+                    decision.reported_position
+                    if decision.reported_position is not None
+                    else execution.executed_position
+                ),
+            )
+        )
     ledger = [
         LedgerEntry(
             trader_id=execution.trader_id,
@@ -341,8 +464,9 @@ def run_episode_round(
 
 def run_episode(
     config: EpisodeConfig,
-    plan_provider: PlanProvider = default_plan_provider,
+    plan_provider: Optional[PlanProvider] = None,
     output_root: Optional[Union[str, Path]] = None,
+    policies: Optional[Mapping[str, TraderPolicy]] = None,
 ) -> EpisodeResult:
     states = {
         trader_id: TraderState(trader_id, config.initial_budget)
@@ -364,6 +488,7 @@ def run_episode(
             market_seed=market_seed,
             states=states,
             plan_provider=plan_provider,
+            policies=policies,
         )
         result.rounds.append(record)
         if writer is not None:

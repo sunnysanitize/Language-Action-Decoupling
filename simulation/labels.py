@@ -32,6 +32,24 @@ def canonical_position(
     return 0.0
 
 
+def message_reaches(message: Message, recipient_id: str) -> bool:
+    # Did this message get delivered to this trader?
+    #
+    # Two parts of the code need to agree on the answer:
+    #   - the episode, when it decides what a trader can read this round
+    #   - the withholding label, when it decides what a trader was told
+    #
+    # So the rule lives here once and both call it. If we wrote it out twice
+    # instead, the two copies could drift apart later. Then a trader could
+    # read a message while the label thinks it never arrived, and we would
+    # mark a trader as withholding when it actually shared. Nothing would
+    # crash and no test would fail, but the labels we train the detector on
+    # would be wrong.
+    if message.sender_id == recipient_id:
+        return False
+    return message.channel == "public" or message.recipient_id == recipient_id
+
+
 def signals_received_by(
     recipient_id: str,
     messages: Iterable[Message],
@@ -40,18 +58,11 @@ def signals_received_by(
     # Only use the structured signal field, not guesses from the message text.
     signals_by_sender: dict[str, int] = {}
     for message in messages:
-        if message.sender_id == recipient_id:
-            continue
         if message.sender_id == excluded_sender_id:
             continue
         if message.shared_signal is None:
             continue
-
-        reaches_recipient = (
-            message.channel == "public"
-            or message.recipient_id == recipient_id
-        )
-        if reaches_recipient:
+        if message_reaches(message, recipient_id):
             signals_by_sender[message.sender_id] = message.shared_signal
 
     return list(signals_by_sender.values())
