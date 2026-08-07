@@ -28,8 +28,9 @@ build/
 dist/
 *.egg-info/
 
-# Editors and operating systems
+# Editors, operating systems and coding agents
 .idea/
 .vscode/
 .DS_Store
 nvim.log
+CLAUDE.md

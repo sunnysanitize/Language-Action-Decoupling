@@ -12,6 +12,7 @@ Open a terminal in the project directory, then run:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m marketarena.market
+pip install -r requirements.txt
 ```
 
 ## Windows
@@ -22,7 +23,18 @@ Open PowerShell in the project directory, then run:
 py -m venv .venv
 .venv\Scripts\Activate.ps1
 py -m marketarena.market
+pip install -r requirements.txt
 ```
+
+## API Keys
+
+Before running you need to add your Azure API keys. Copy the `.env.example` file to `.env` and fill in the key:
+
+```bash
+cp .env.example .env
+```
+
+Then fill in the `.env` file with your API key.
 
 ## Run it again later
 
