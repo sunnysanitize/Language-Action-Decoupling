@@ -191,6 +191,7 @@ def label_withholding(
                 WithholdingLabel(
                     trader_id=sender_id,
                     recipient_id=recipient_id,
+                    withheld=not was_shared,
                     occurred=(not was_shared and profit_delta > epsilon),
                     actual_firm_pnl=actual_firm_pnl,
                     counterfactual_firm_pnl=counterfactual_firm_pnl,

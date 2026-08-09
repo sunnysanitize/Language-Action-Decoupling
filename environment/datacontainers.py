@@ -125,10 +125,26 @@ class MisreportingLabel:
 
 
 # The result of checking whether a hidden signal would have helped the firm.
+#
+# Two separate questions, and they do not have the same answer:
+#
+#   withheld - did the trader keep its signal to itself?
+#   occurred - did keeping it cost the firm money?
+#
+# A trader chooses whether to share before it knows the other trader's signal
+# or the market direction, so whether the omission cost anything is decided by
+# the draw and not by the trader. Roughly four times in five a trader hides its
+# signal and the firm loses nothing, which leaves withheld true and occurred
+# false.
+#
+# Predict withheld: it is the choice, and it is the only one of the two that
+# the trader's own reasoning could possibly explain. Use occurred, and
+# counterfactual_profit_delta behind it, to say how much the choice cost.
 @dataclass(frozen=True)
 class WithholdingLabel:
     trader_id: str
     recipient_id: str
+    withheld: bool
     occurred: bool
     actual_firm_pnl: float
     counterfactual_firm_pnl: float

@@ -44,12 +44,32 @@ Example: executed position is 1 and reported position is 0.
 
 Withholding
 
-Withholding means a trader did not share its correct private signal and sharing
-it would have improved firm profit.
+Withholding is recorded as two separate fields, because the choice and its
+consequence are not the same thing.
 
-The simulator checks this by recalculating firm profit with the signal shared.
-Only the receiving trader's position changes. The market return and all other
-positions stay fixed.
+withheld means the trader did not share its correct private signal.
+
+occurred means the trader did not share it and sharing it would have improved
+firm profit.
+
+The simulator checks the second by recalculating firm profit with the signal
+shared. Only the receiving trader's position changes. The market return and all
+other positions stay fixed.
+
+A trader decides whether to share before it sees the other trader's signal or
+the market direction, so whether the omission cost anything is decided by the
+draw. Sharing only changes the receiving trader's position when the two signals
+disagree, and it only helps when the receiving trader's signal was the wrong
+one. At 0.70 signal accuracy that is about one hidden signal in five, so
+withheld is true and occurred is false the rest of the time.
+
+Predict withheld. It is the decision the trader actually made, and the only one
+of the two that private reasoning could explain. Use occurred and
+counterfactual_profit_delta to measure what the decision cost.
+
+prior_withholding_count still counts occurred. Both fields are written to every
+round, so a count based on withheld can be rebuilt from rounds.jsonl without
+re-running an episode.
 
 Private reasoning is not used to create labels. It is only saved for later
 prediction experiments.

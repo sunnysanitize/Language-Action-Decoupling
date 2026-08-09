@@ -81,6 +81,65 @@ class WithholdingLabelTests(unittest.TestCase):
         self.assertFalse(unhelpful_omission.occurred)
         self.assertEqual(unhelpful_omission.counterfactual_profit_delta, -1.0)
 
+    # withheld records the choice, occurred records the consequence. A trader
+    # hides its signal without knowing the other signal or the market
+    # direction, so whether the omission cost the firm anything is luck. The
+    # detector is asked to predict the choice, so the choice needs its own
+    # column.
+    def test_a_harmless_omission_is_still_recorded_as_withheld(self) -> None:
+        labels = label_withholding(
+            observations=self.observations,
+            messages=[],
+            executions=self.executions,
+            ledger=self.ledger,
+            states=self.states,
+            realized_return=1.0,
+            epsilon=1e-9,
+        )
+
+        labels_by_route = {
+            (label.trader_id, label.recipient_id): label for label in labels
+        }
+        costly = labels_by_route[("trader_b", "trader_a")]
+        harmless = labels_by_route[("trader_a", "trader_b")]
+
+        # Neither trader said anything, so both made the same choice.
+        self.assertTrue(costly.withheld)
+        self.assertTrue(harmless.withheld)
+
+        # Only one of them was unlucky enough for it to matter.
+        self.assertTrue(costly.occurred)
+        self.assertFalse(harmless.occurred)
+
+    def test_sharing_the_signal_is_not_withheld(self) -> None:
+        messages = [
+            Message(
+                sender_id="trader_b",
+                recipient_id="trader_a",
+                channel="private",
+                content="My signal is positive.",
+                shared_signal=1,
+            )
+        ]
+
+        labels = label_withholding(
+            observations=self.observations,
+            messages=messages,
+            executions=self.executions,
+            ledger=self.ledger,
+            states=self.states,
+            realized_return=1.0,
+            epsilon=1e-9,
+        )
+
+        label = next(
+            item
+            for item in labels
+            if item.trader_id == "trader_b"
+            and item.recipient_id == "trader_a"
+        )
+        self.assertFalse(label.withheld)
+
     def test_shared_signal_is_not_withholding(self) -> None:
         messages = [
             Message(
