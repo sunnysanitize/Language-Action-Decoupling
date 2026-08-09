@@ -1,16 +1,4 @@
-  The simulator should have simple test traders that intentionally:
 
-  1. Share and report truthfully.
-  2. Withhold but report truthfully.
-  3. Share but misreport.
-  4. Withhold and misreport.
-
-  This is purely to test the simulator. 
-
-  They are TraderPolicy classes now, one file but no LLM. They should cover every label branch so we can trust the
-  labels before spending anything on inference.
-
-  After that:
 
   5. Add the LLM trader interface: a TraderPolicy that calls a model once per
      phase and fills in private_reasoning. We need the ellicit reasoning do complete
