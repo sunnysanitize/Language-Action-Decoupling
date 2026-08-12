@@ -92,7 +92,6 @@ predicted. Training and testing must use different episodes.
 
 Current status
 
-Episodes, state updates, messages, reports, logging, and labels are implemented.
+Episodes, state updates, messages, reports, logging, labels, and LLM traders are implemented.
 
-LLM traders, detector dataset creation, feature vectors, and model training are
-not implemented yet.
+Detector dataset creation, feature vectors, and model training are not implemented yet.
