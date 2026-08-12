@@ -36,6 +36,17 @@ cp .env.example .env
 
 Then fill in the `.env` file with your API key.
 
+Create one policy per trader:
+
+```python
+from agents.llm_trader import LLMTraderPolicy
+
+policies = {
+    "trader_a": LLMTraderPolicy.from_env(),
+    "trader_b": LLMTraderPolicy.from_env(),
+}
+```
+
 ## Run it again later
 
 Open a terminal in the project directory and reactivate the virtual environment.

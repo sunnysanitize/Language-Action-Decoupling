@@ -1,2 +1,3 @@
 # Needed by agent files that call a model.
 openai>=1.0.0
+python-dotenv>=1.0.0
