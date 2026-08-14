@@ -73,6 +73,15 @@ def show_round(record: dict, full: bool, width: int) -> None:
     after = by_trader(record["post_round_states"])
     misreporting = by_trader(record["misreporting_labels"])
 
+    # .get keeps the viewer working on schema 1 runs already in runs/.
+    for item in record.get("delivered_feedback", []):
+        audience = item["trader_id"] or "the desk"
+        content = item["content"]
+        if not full and len(content) > 240:
+            content = content[:240].rstrip() + " ..."
+        print()
+        print(f"boss to {audience}: {content}")
+
     for trader_id in sorted(signals):
         state = before[trader_id]
         signal = signals[trader_id]["signal"]
@@ -93,7 +102,12 @@ def show_round(record: dict, full: bool, width: int) -> None:
                 (
                     item
                     for item in record["reasoning"]
-                    if item["trader_id"] == trader_id and item["phase"] == phase
+                    # Schema 1 called this trader_id; schema 2 renamed it to
+                    # actor_id when the boss started writing to the same list.
+                    # Runs are regenerable, but not for free, so the viewer
+                    # reads both rather than orphaning the ones on disk.
+                    if item.get("actor_id", item.get("trader_id")) == trader_id
+                    and item["phase"] == phase
                 ),
                 None,
             )

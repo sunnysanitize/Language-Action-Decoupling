@@ -10,7 +10,7 @@ from agents.policy import (
     TradeContext,
     TradeDecision,
 )
-from environment.datacontainers import EpisodeConfig, Message
+from environment.datacontainers import EpisodeConfig, Message, ReasoningTrace
 from simulation.episode import run_episode
 
 
@@ -199,6 +199,12 @@ class PolicyDefaultsTests(unittest.TestCase):
 
 
 class ReasoningTraceTests(unittest.TestCase):
+    def test_a_trace_names_the_actor_that_wrote_it(self) -> None:
+        # Not trader_id: the boss writes into this same list.
+        trace = ReasoningTrace("boss_1", "pre_review", "the desk is behind")
+
+        self.assertEqual(trace.actor_id, "boss_1")
+
     def test_every_phase_records_reasoning_in_phase_order(self) -> None:
         def make() -> RecordingPolicy:
             return RecordingPolicy(

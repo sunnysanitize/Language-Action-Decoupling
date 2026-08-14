@@ -1,7 +1,12 @@
 # This file holds the data used by the market and episode.
 
 from dataclasses import dataclass, field
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
+
+# agents.boss builds its views out of the records defined here, so importing it
+# at runtime would close a cycle. The annotation is all this file needs.
+if TYPE_CHECKING:
+    from agents.boss import BossFeedback
 
 
 # The real market result for one round.
@@ -89,10 +94,13 @@ class Message:
     shared_signal: Optional[int] = None
 
 
-# Private reasoning written before sharing or reporting.
+# Private reasoning written before a decision, by whoever made it.
+#
+# actor_id rather than trader_id: the boss writes into this same list, and an
+# id field named for one role would be a misnomer the moment it holds another.
 @dataclass(frozen=True)
 class ReasoningTrace:
-    trader_id: str
+    actor_id: str
     phase: str
     content: str
 
@@ -155,6 +163,9 @@ class RoundDetails:
     misreporting_labels: list[MisreportingLabel]
     withholding_labels: list[WithholdingLabel]
     post_round_states: list[TraderState]
+    # What the boss said to traders before this round ran. A desk-wide mandate
+    # appears once here even though it reached every trader.
+    delivered_feedback: list["BossFeedback"] = field(default_factory=list)
 
 
 # The settings and all completed rounds from one episode.

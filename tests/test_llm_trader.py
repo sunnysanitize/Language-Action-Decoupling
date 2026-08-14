@@ -66,7 +66,7 @@ class LLMTraderPolicyTests(TestCase):
             [
                 trace.content
                 for trace in record.reasoning
-                if trace.trader_id == "trader_a"
+                if trace.actor_id == "trader_a"
             ],
             [
                 "Sharing may improve the firm result.",
