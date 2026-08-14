@@ -11,11 +11,14 @@
 # completed round, so each rule below drops something the record contains.
 
 from dataclasses import dataclass
-from typing import Sequence, Tuple, TypeVar
+from typing import TYPE_CHECKING, Sequence, Tuple
 
-from agents.policy import PeerView, SelfView, peer_view, self_view
+from agents.policy import PeerView, SelfView, own_record, peer_view, self_view
 from environment.datacontainers import Message, RoundDetails
 from simulation.labels import message_reaches
+
+if TYPE_CHECKING:
+    from agents.boss import BossFeedback
 
 
 # One completed round as the trader itself experienced it.
@@ -44,28 +47,15 @@ class RoundMemory:
     own_pnl: float
     state_after: SelfView
     peers_after: Tuple[PeerView, ...]
-
-
-Record = TypeVar("Record")
-
-
-# A missing record is a broken round, not an empty memory.
-#
-# Returning a default would turn a mistyped trader id into a trader that
-# quietly remembers nothing, which reads as a trader who did nothing.
-def _own(records: Sequence[Record], trader_id: str, kind: str) -> Record:
-    for record in records:
-        if record.trader_id == trader_id:  # type: ignore[attr-defined]
-            return record
-    raise KeyError(f"round has no {kind} for {trader_id}")
+    boss_feedback: Tuple["BossFeedback", ...] = ()
 
 
 def _round_memory(trader_id: str, record: RoundDetails) -> RoundMemory:
-    observation = _own(record.observations, trader_id, "observation")
-    execution = _own(record.executions, trader_id, "execution")
-    report = _own(record.reports, trader_id, "report")
-    entry = _own(record.ledger, trader_id, "ledger entry")
-    state = _own(record.post_round_states, trader_id, "post-round state")
+    observation = own_record(record.observations, trader_id, "observation")
+    execution = own_record(record.executions, trader_id, "execution")
+    report = own_record(record.reports, trader_id, "report")
+    entry = own_record(record.ledger, trader_id, "ledger entry")
+    state = own_record(record.post_round_states, trader_id, "post-round state")
 
     return RoundMemory(
         round_number=record.round_number,
@@ -100,6 +90,13 @@ def _round_memory(trader_id: str, record: RoundDetails) -> RoundMemory:
             peer_view(other)
             for other in record.post_round_states
             if other.trader_id != trader_id
+        ),
+        # A desk-wide mandate (trader_id None) reached everyone; per-trader
+        # feedback reached only its addressee.
+        boss_feedback=tuple(
+            item
+            for item in record.delivered_feedback
+            if item.trader_id in (None, trader_id)
         ),
     )
 

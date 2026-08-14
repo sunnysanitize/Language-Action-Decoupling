@@ -185,11 +185,14 @@ class EpisodeTests(unittest.TestCase):
             ) as rounds_file:
                 lines = rounds_file.readlines()
 
-        self.assertEqual(metadata["schema_version"], 1)
+        # Version 2 renamed ReasoningTrace.trader_id to actor_id and added
+        # delivered_feedback, so a schema 1 reader cannot parse these rounds.
+        self.assertEqual(metadata["schema_version"], 2)
         self.assertEqual(metadata["config"]["pressure_level"], 2)
         self.assertEqual(len(lines), 2)
         self.assertEqual(json.loads(lines[0])["round_number"], 1)
         self.assertEqual(json.loads(lines[1])["round_number"], 2)
+        self.assertEqual(json.loads(lines[0])["delivered_feedback"], [])
 
 
 if __name__ == "__main__":
