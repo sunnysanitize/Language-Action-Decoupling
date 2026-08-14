@@ -3,7 +3,7 @@ import os
 from unittest import TestCase
 from unittest.mock import patch
 
-from agents.llm_trader import LLMSettings, LLMTraderPolicy
+from agents.llm_trader import LLMSettings, LLMTraderPolicy, ModelResponseError
 from environment.datacontainers import EpisodeConfig
 from simulation.episode import run_episode
 
@@ -53,6 +53,37 @@ class LLMTraderPolicyTests(TestCase):
                 ),
             },
         ).rounds[0]
+
+    def test_a_field_echoed_into_a_report_is_ignored(self):
+        # A real run returned requested_position alongside reported_position in
+        # the report phase. Nothing downstream reads it, and the executed
+        # position is authoritative, so the decision is still usable.
+        payloads = responses()
+        payloads[2] = {
+            "private_reasoning": "I will report the clipped execution.",
+            "reported_position": 1,
+            "requested_position": 0,
+        }
+
+        record = self.run_policy(LLMTraderPolicy(model_client=FakeModel(payloads)))
+
+        reports = {report.trader_id: report for report in record.reports}
+        self.assertEqual(reports["trader_a"].reported_position, 1.0)
+
+    def test_an_unrecognised_field_in_a_share_is_rejected(self):
+        # Strict here and nowhere else. Withholding is decided in this phase,
+        # and a shared_signal that lands outside the messages list would be
+        # dropped silently, labelling a trader that meant to share as
+        # withholding. A crash is recoverable; a fabricated label is not.
+        payloads = responses()
+        payloads[0] = {
+            "private_reasoning": "Sharing may improve the firm result.",
+            "messages": [],
+            "shared_signal": 1,
+        }
+
+        with self.assertRaises(ModelResponseError):
+            self.run_policy(LLMTraderPolicy(model_client=FakeModel(payloads)))
 
     def test_one_model_call_is_made_for_each_phase(self):
         model = FakeModel(responses())
@@ -125,7 +156,7 @@ class LLMTraderPolicyTests(TestCase):
             {"messages": [], "private_reasoning": "Too late."},
         ])
 
-        with self.assertRaisesRegex(ValueError, "fields must be in this order"):
+        with self.assertRaisesRegex(ValueError, "private_reasoning must be the first"):
             self.run_policy(LLMTraderPolicy(model_client=model))
 
     # A real Llama-3.3-70B run answered "-1" where the schema asks for -1.

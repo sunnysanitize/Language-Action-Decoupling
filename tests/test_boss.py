@@ -217,6 +217,40 @@ class LLMBossTests(unittest.TestCase):
         with self.assertRaises(ModelResponseError):
             LLMBossPolicy(model_client=model).mandate(self.mandate_context())
 
+    def test_a_field_echoed_back_from_the_prompt_is_ignored(self) -> None:
+        # A 70B model repeats prompt keys it reads as instructions. Rejecting
+        # the whole response for that throws away a decision the model plainly
+        # made, and the echo carries no information the boss acts on.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "the desk needs pushing",
+                    "phase": "mandate",
+                    "content": "work harder",
+                }
+            ]
+        )
+
+        decision = LLMBossPolicy(model_client=model).mandate(self.mandate_context())
+
+        self.assertEqual(decision.content, "work harder")
+
+    def test_a_missing_decision_field_is_still_rejected(self) -> None:
+        model = FakeModel([{"private_reasoning": "thinking", "phase": "mandate"}])
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model_client=model).mandate(self.mandate_context())
+
+    def test_reasoning_after_the_decision_is_still_rejected(self) -> None:
+        # Tolerating extra keys must not tolerate a reasoning field written
+        # after the decision it claims to explain.
+        model = FakeModel(
+            [{"content": "work harder", "extra": 1, "private_reasoning": "late"}]
+        )
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model_client=model).mandate(self.mandate_context())
+
     def test_a_review_returns_feedback_per_trader(self) -> None:
         model = FakeModel(
             [{"private_reasoning": "a is behind", "feedback": {"trader_a": "step up"}}]
@@ -226,6 +260,20 @@ class LLMBossTests(unittest.TestCase):
 
         self.assertEqual(decision.feedback, {"trader_a": "step up"})
 
+    def test_the_review_schema_names_the_real_traders(self) -> None:
+        # A placeholder key called "trader_id" is ambiguous, and a real run
+        # resolved it the wrong way: the model returned
+        # {"trader_id": "trader_b"}, putting the id in the value. Naming the
+        # desk's actual ids leaves nothing to interpret.
+        model = FakeModel(
+            [{"private_reasoning": "ok", "feedback": {"trader_a": "fine"}}]
+        )
+
+        LLMBossPolicy(model_client=model).review(self.review_context())
+
+        schema = model.calls[0][1]["response_fields_in_order"]["feedback"]
+        self.assertEqual(list(schema), ["trader_a"])
+
     def test_feedback_for_a_trader_outside_the_desk_is_rejected(self) -> None:
         model = FakeModel(
             [{"private_reasoning": "ok", "feedback": {"trader_z": "hello"}}]
@@ -233,6 +281,17 @@ class LLMBossTests(unittest.TestCase):
 
         with self.assertRaises(ModelResponseError):
             LLMBossPolicy(model_client=model).review(self.review_context())
+
+    def test_the_boss_is_never_shown_a_bare_pressure_code(self) -> None:
+        # Same rule as the traders. The directive's words carry the condition;
+        # the integer is an experiment-side label and reads as a dial.
+        model = FakeModel(
+            [{"private_reasoning": "ok", "content": "work harder"}]
+        )
+
+        LLMBossPolicy(model_client=model).mandate(self.mandate_context())
+
+        self.assertNotIn("pressure_level", json.dumps(model.calls[0][1]))
 
     def test_the_boss_prompt_never_carries_ground_truth(self) -> None:
         model = FakeModel(
