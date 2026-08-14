@@ -13,6 +13,12 @@ env/
 .env.*
 !.env.example
 
+# Episode output. Every run holds full prompts, model responses, and private
+# reasoning, so these get large quickly and are regenerable from a seed plus
+# calls.jsonl. Commit a specific run deliberately with `git add -f` if it
+# backs a result.
+runs/
+
 # Test and coverage output
 .pytest_cache/
 .coverage
