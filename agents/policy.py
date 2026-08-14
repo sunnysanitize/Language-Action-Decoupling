@@ -15,7 +15,7 @@
 # canonical position for a trade, and a truthful report of the execution.
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Protocol, Tuple
+from typing import TYPE_CHECKING, Optional, Protocol, Sequence, Tuple, TypeVar
 
 from environment.datacontainers import (
     Execution,
@@ -27,6 +27,7 @@ from environment.datacontainers import (
 # agents.memory builds RoundMemory out of the views defined here, so importing
 # it at runtime would close a cycle. The annotation is all this file needs.
 if TYPE_CHECKING:
+    from agents.boss import BossFeedback
     from agents.memory import RoundMemory
 
 
@@ -67,6 +68,21 @@ def self_view(state: TraderState) -> SelfView:
     )
 
 
+Record = TypeVar("Record")
+
+
+# Pull one actor's record out of a round, for any of the per-trader lists.
+#
+# A missing record is a broken round, not an empty view. Returning a default
+# would turn a mistyped id into an actor that quietly did nothing, which reads
+# as an actor that chose to do nothing.
+def own_record(records: Sequence[Record], actor_id: str, kind: str) -> Record:
+    for record in records:
+        if record.trader_id == actor_id:  # type: ignore[attr-defined]
+            return record
+    raise KeyError(f"round has no {kind} for {actor_id}")
+
+
 def peer_view(state: TraderState) -> PeerView:
     return PeerView(
         trader_id=state.trader_id,
@@ -83,16 +99,22 @@ def peer_view(state: TraderState) -> PeerView:
 # contexts because the trade and report contexts already carry this one, so
 # there is a single copy per round and no way for the phases to disagree about
 # what the trader remembers.
+#
+# There is no pressure_level here. A trader learns how hard the firm is
+# squeezing it from what its boss says and from what actually happens to its
+# budget and rank, which is the contract in docs/role_contract.md. Handing it
+# the condition as an integer let the model read the experiment's independent
+# variable straight off the prompt and treat it as an instruction.
 @dataclass(frozen=True)
 class ShareContext:
     episode_id: str
     round_number: int
-    pressure_level: int
     signal_accuracy: float
     observation: TraderObservation
     state: SelfView
     peers: Tuple[PeerView, ...] = ()
     memory: Tuple["RoundMemory", ...] = ()
+    boss_feedback: Tuple["BossFeedback", ...] = ()
 
     @property
     def trader_id(self) -> str:

@@ -2,11 +2,13 @@ import json
 import unittest
 from dataclasses import asdict
 
+from agents.boss import BossFeedback
 from agents.memory import RoundMemory, trader_memory
 from agents.policy import (
     PeerView,
     ReportDecision,
     SelfView,
+    ShareContext,
     ShareDecision,
     TradeDecision,
 )
@@ -201,6 +203,22 @@ class TraderMemoryTests(unittest.TestCase):
                 ["budget", "cumulative_pnl", "rank", "trader_id"],
             )
 
+    def test_memory_keeps_the_feedback_the_trader_was_given(self) -> None:
+        record = build_round()
+        record.delivered_feedback = [
+            BossFeedback("boss_1", None, "v1", "desk-wide mandate"),
+            BossFeedback("boss_1", "trader_a", "v1", "for a only"),
+            BossFeedback("boss_1", "trader_b", "v1", "SECRET-B-FEEDBACK"),
+        ]
+
+        memory = self.memory_for("trader_a", record)
+
+        self.assertEqual(
+            [item.content for item in memory.boss_feedback],
+            ["desk-wide mandate", "for a only"],
+        )
+        self.assertNotIn("SECRET-B-FEEDBACK", json.dumps(asdict(memory)))
+
     def test_a_trader_with_no_completed_rounds_has_empty_memory(self) -> None:
         self.assertEqual(trader_memory("trader_a", []), ())
 
@@ -227,10 +245,12 @@ class EpisodeMemoryTests(unittest.TestCase):
         def __init__(self) -> None:
             self.memory_by_round: dict[int, tuple] = {}
             self.memory_by_phase: dict[str, tuple] = {}
+            self.share_contexts: dict[int, ShareContext] = {}
 
         def share(self, context):
             self.memory_by_round[context.round_number] = context.memory
             self.memory_by_phase["share"] = context.memory
+            self.share_contexts[context.round_number] = context
             return ShareDecision()
 
         def trade(self, context):
@@ -267,6 +287,15 @@ class EpisodeMemoryTests(unittest.TestCase):
         self.assertEqual(memories[0].round_number, 1)
         self.assertEqual(memories[0].executed_position, executed["trader_a"])
         self.assertEqual(memories[0].realized_return, first_round.world.realized_return)
+
+    def test_the_trader_is_never_shown_a_bare_pressure_code(self) -> None:
+        # role_contract.md: pressure reaches traders through the boss and
+        # through real consequences, never as an unexplained integer.
+        policy, result = self.run_two_rounds()
+
+        self.assertNotIn("pressure_level", asdict(policy.share_contexts[1]))
+        # Still recorded for the detector's situation arm, just not shown.
+        self.assertEqual(result.rounds[0].pressure_level, 0)
 
     def test_every_phase_of_a_round_sees_the_same_memory(self) -> None:
         # The trade and report phases read memory through the share context

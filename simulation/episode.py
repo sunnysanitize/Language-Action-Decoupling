@@ -64,6 +64,19 @@ from environment.datacontainers import (
     WorldState,
 )
 from environment.market import generate_market_round
+from agents.boss import (
+    BOSS_ID,
+    DESK_ID,
+    MANDATE_VERSION,
+    REVIEW_VERSION,
+    BossFeedback,
+    BossPolicy,
+    MandateContext,
+    ReviewContext,
+    desk_view,
+    firm_directive,
+    trader_card,
+)
 from agents.memory import RoundMemory, trader_memory
 from agents.policy import (
     DefaultPolicy,
@@ -121,7 +134,7 @@ class EpisodeJSONLWriter:
         self.rounds_path = self.run_directory / "rounds.jsonl"
 
         metadata = {
-            "schema_version": 1,
+            "schema_version": 2,
             "config": asdict(config),
             "pressure_budget_multiplier": (
                 PRESSURE_BUDGET_MULTIPLIERS[config.pressure_level]
@@ -290,6 +303,7 @@ def run_episode_round(
     plan_provider: Optional[PlanProvider] = None,
     policies: Optional[Mapping[str, TraderPolicy]] = None,
     memories: Optional[Mapping[str, Tuple[RoundMemory, ...]]] = None,
+    feedback: Optional[Mapping[str, Tuple[BossFeedback, ...]]] = None,
 ) -> Tuple[RoundDetails, dict[str, TraderState]]:
     market = generate_market_round(
         seed=market_seed,
@@ -324,7 +338,6 @@ def run_episode_round(
         share_context = ShareContext(
             episode_id=config.episode_id,
             round_number=round_number,
-            pressure_level=config.pressure_level,
             signal_accuracy=config.signal_accuracy,
             observation=observations_by_trader[trader_id],
             state=self_view(states[trader_id]),
@@ -334,6 +347,9 @@ def run_episode_round(
                 if other_id != trader_id
             ),
             memory=() if memories is None else tuple(memories.get(trader_id, ())),
+            boss_feedback=(
+                () if feedback is None else tuple(feedback.get(trader_id, ()))
+            ),
         )
         share_contexts[trader_id] = share_context
         decision = trader_policies[trader_id].share(share_context)
@@ -446,6 +462,17 @@ def run_episode_round(
         round_number=round_number,
     )
 
+    # One entry per distinct statement. dict.fromkeys keeps delivery order
+    # while removing the duplicate that a desk-wide mandate produces by
+    # reaching every trader.
+    delivered_feedback = list(
+        dict.fromkeys(
+            item
+            for trader_id in sorted_ids
+            for item in (() if feedback is None else feedback.get(trader_id, ()))
+        )
+    )
+
     record = RoundDetails(
         episode_id=config.episode_id,
         round_number=round_number,
@@ -463,6 +490,7 @@ def run_episode_round(
         misreporting_labels=misreporting_labels,
         withholding_labels=withholding_labels,
         post_round_states=_copy_states(next_states),
+        delivered_feedback=delivered_feedback,
     )
     return record, next_states
 
@@ -472,6 +500,7 @@ def run_episode(
     plan_provider: Optional[PlanProvider] = None,
     output_root: Optional[Union[str, Path]] = None,
     policies: Optional[Mapping[str, TraderPolicy]] = None,
+    boss: Optional[BossPolicy] = None,
 ) -> EpisodeResult:
     states = {
         trader_id: TraderState(trader_id, config.initial_budget)
@@ -484,6 +513,38 @@ def run_episode(
         else None
     )
     seed_generator = random.Random(config.seed)
+
+    # The boss speaks between rounds, never inside one, so the schedule lives
+    # here rather than in run_episode_round.
+    directive = firm_directive(config.pressure_level)
+    pending: dict[str, Tuple[BossFeedback, ...]] = {
+        trader_id: () for trader_id in TRADER_IDS
+    }
+    pending_reasoning: list[ReasoningTrace] = []
+    reviewed_through = 0
+
+    if boss is not None:
+        mandate = boss.mandate(
+            MandateContext(
+                directive=directive,
+                desk_id=DESK_ID,
+                trader_ids=TRADER_IDS,
+                total_rounds=config.rounds,
+            )
+        )
+        # One desk-wide statement delivered to everyone. Both traders knowing
+        # they heard the same thing is part of what makes it a mandate.
+        statement = BossFeedback(
+            boss_id=BOSS_ID,
+            trader_id=None,
+            version=MANDATE_VERSION,
+            content=mandate.content,
+        )
+        pending = {trader_id: (statement,) for trader_id in TRADER_IDS}
+        if mandate.private_reasoning:
+            pending_reasoning.append(
+                ReasoningTrace(BOSS_ID, "mandate", mandate.private_reasoning)
+            )
 
     for round_number in range(1, config.rounds + 1):
         market_seed = seed_generator.randrange(0, 2**63)
@@ -501,7 +562,57 @@ def run_episode(
                 trader_id: trader_memory(trader_id, result.rounds)
                 for trader_id in TRADER_IDS
             },
+            feedback=pending,
         )
+        pending = {trader_id: () for trader_id in TRADER_IDS}
+        record.reasoning.extend(pending_reasoning)
+        pending_reasoning = []
+
+        # The review runs before the record is written, so the boss's reasoning
+        # lands on the round it was written about.
+        is_review_round = round_number % config.review_interval == 0
+        if boss is not None and is_review_round and round_number < config.rounds:
+            period = result.rounds[reviewed_through:] + [record]
+            completed = result.rounds + [record]
+            review = boss.review(
+                ReviewContext(
+                    directive=directive,
+                    round_number=round_number,
+                    desk=desk_view(DESK_ID, completed, period),
+                    traders=tuple(
+                        trader_card(trader_id, period) for trader_id in TRADER_IDS
+                    ),
+                    prior_feedback=tuple(record.delivered_feedback),
+                )
+            )
+            # A directive addressed to nobody is a silently undelivered
+            # message, so a wrong id fails loudly rather than vanishing.
+            unknown = set(review.feedback) - set(TRADER_IDS)
+            if unknown:
+                raise ValueError(
+                    f"boss addressed unknown traders: {sorted(unknown)}"
+                )
+            pending = {
+                trader_id: (
+                    (
+                        BossFeedback(
+                            boss_id=BOSS_ID,
+                            trader_id=trader_id,
+                            version=REVIEW_VERSION,
+                            content=review.feedback[trader_id],
+                        ),
+                    )
+                    if trader_id in review.feedback
+                    else ()
+                )
+                for trader_id in TRADER_IDS
+            }
+            if review.private_reasoning:
+                record.reasoning.append(
+                    ReasoningTrace(BOSS_ID, "pre_review", review.private_reasoning)
+                )
+            reviewed_through = round_number
+
         result.rounds.append(record)
         if writer is not None:
             writer.write_round(record)
