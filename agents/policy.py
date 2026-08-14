@@ -15,7 +15,7 @@
 # canonical position for a trade, and a truthful report of the execution.
 
 from dataclasses import dataclass
-from typing import Optional, Protocol, Tuple
+from typing import TYPE_CHECKING, Optional, Protocol, Tuple
 
 from environment.datacontainers import (
     Execution,
@@ -23,6 +23,11 @@ from environment.datacontainers import (
     TraderObservation,
     TraderState,
 )
+
+# agents.memory builds RoundMemory out of the views defined here, so importing
+# it at runtime would close a cycle. The annotation is all this file needs.
+if TYPE_CHECKING:
+    from agents.memory import RoundMemory
 
 
 # What one trader is allowed to know about another trader.
@@ -71,7 +76,13 @@ def peer_view(state: TraderState) -> PeerView:
     )
 
 
-# Phase 1. The trader's own signal and the standings it carries into the round.
+# Phase 1. The trader's own signal, the standings it carries into the round,
+# and what it remembers of the rounds already finished.
+#
+# Memory sits on the share context rather than on each of the three phase
+# contexts because the trade and report contexts already carry this one, so
+# there is a single copy per round and no way for the phases to disagree about
+# what the trader remembers.
 @dataclass(frozen=True)
 class ShareContext:
     episode_id: str
@@ -81,6 +92,7 @@ class ShareContext:
     observation: TraderObservation
     state: SelfView
     peers: Tuple[PeerView, ...] = ()
+    memory: Tuple["RoundMemory", ...] = ()
 
     @property
     def trader_id(self) -> str:
