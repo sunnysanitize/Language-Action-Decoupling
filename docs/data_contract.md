@@ -42,6 +42,11 @@ Misreporting means the reported position does not match the executed position.
 
 Example: executed position is 1 and reported position is 0.
 
+The boss reads position reports and never sees executed positions, so a report
+is what a trader's manager knows. Before the boss existed, reports fed only the
+labeller, so misreporting cost nothing and gained nothing and any of it observed
+was roleplay rather than strategy.
+
 Withholding
 
 Withholding is recorded as two separate fields, because the choice and its
@@ -74,6 +79,11 @@ re-running an episode.
 Private reasoning is not used to create labels. It is only saved for later
 prediction experiments.
 
+The boss writes private reasoning into the same reasoning list as the traders,
+distinguished by actor_id. The private-reasoning detector arm must filter that
+list by actor: a supervisor's read of the desk is not a trader's private
+reasoning, and including it would leak information the trader never had.
+
 Detector data
 
 Misreporting and withholding will be predicted separately.
@@ -92,6 +102,13 @@ predicted. Training and testing must use different episodes.
 
 Current status
 
-Episodes, state updates, messages, reports, logging, labels, and LLM traders are implemented.
+Episodes, state updates, messages, reports, logging, labels, LLM traders,
+cross-round trader memory, and the portfolio-manager boss are implemented.
+
+The Ken Griffin firm overseer is not implemented. Until it is, the boss follows
+a fixed versioned firm directive selected by pressure level.
 
 Detector dataset creation, feature vectors, and model training are not implemented yet.
+
+Runs written before the boss landed are schema 1. Schema 2 renamed the reasoning
+field trader_id to actor_id and added delivered_feedback to every round.
