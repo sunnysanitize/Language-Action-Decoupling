@@ -1,13 +1,7 @@
   6. Implement the remaining agents.
-     memory.py and boss.py are done. kengriffin.py is still empty, and
-     trader.py is still a simple scripted trader. Finish each and add tests
-     for its behavior.
+     memory.py, boss.py, kengriffin.py, and the LLM trader are done.
 
-  7. Connect all agents to the episode.
-     Traders and the boss are connected, each with visibility-filtered memory
-     and feedback between rounds. The overseer still needs connecting: it
-     should produce the FirmDirective that agents/boss.py currently holds as
-     fixed text per pressure level.
+  7. Connect all agents to the episode. Done.
 
   8. Record and replay every model call so an episode can be re-run exactly.
      Put the prompts, responses, model, and sampling settings in the run data.
