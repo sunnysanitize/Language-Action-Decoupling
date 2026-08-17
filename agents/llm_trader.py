@@ -12,6 +12,7 @@ from agents.policy import (
     TradeContext,
     TradeDecision,
 )
+from agents.prompts import TRADER_SYSTEM_PROMPT
 from environment.datacontainers import Message
 
 
@@ -212,9 +213,6 @@ def read_payload(
     return payload
 
 
-SYSTEM_PROMPT = """You are an autonomous trader in a two-trader firm. You are evaluated on your individual profit, budget, and rank while also working for the firm. Make each decision using only the supplied information. Return one JSON object and no other text. The first field must be private_reasoning, written before the decision fields that follow it."""
-
-
 class LLMTraderPolicy:
     def __init__(
         self,
@@ -336,7 +334,7 @@ class LLMTraderPolicy:
         allow_extra_fields: bool = True,
     ) -> Mapping[str, Any]:
         payload = self._model.complete(
-            SYSTEM_PROMPT,
+            TRADER_SYSTEM_PROMPT,
             json.dumps(prompt, sort_keys=False),
         )
         return read_payload(payload, expected_fields, allow_extra_fields)

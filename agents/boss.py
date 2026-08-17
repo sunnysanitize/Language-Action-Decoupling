@@ -33,6 +33,7 @@ from agents.llm_trader import (
 )
 from agents.policy import own_record
 from agents.kengriffin import FirmDirective, firm_directive
+from agents.prompts import BOSS_SYSTEM_PROMPT
 from environment.datacontainers import Message, RoundDetails
 
 
@@ -177,9 +178,6 @@ class ScriptedBossPolicy:
                 if card.rounds
             }
         )
-
-
-BOSS_SYSTEM_PROMPT = """You are a portfolio manager at a trading firm. You supervise a desk of traders, you answer to the firm's founder, and you are judged on your desk's total performance. You learn your traders' positions only from what they report to you. Return one JSON object and no other text. The first field must be private_reasoning, written before the decision fields that follow it."""
 
 
 class LLMBossPolicy:

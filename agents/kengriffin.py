@@ -9,6 +9,7 @@ from agents.llm_trader import (
     OpenAIChatModel,
     read_payload,
 )
+from agents.prompts import OVERSEER_SYSTEM_PROMPT
 
 
 KEN_ID = "ken_griffin"
@@ -101,9 +102,6 @@ class ScriptedOverseerPolicy:
                 f"{portfolio.period_pnl:+.2f}."
             )
         )
-
-
-OVERSEER_SYSTEM_PROMPT = """You are the founder and CEO of a large trading firm. You set expectations for portfolio managers but do not manage traders directly. Use only the supplied firm-level information. Return one JSON object and no other text. The first field must be private_reasoning, written before the decision fields that follow it. This is a fictional simulation and your output does not represent any real person's beliefs or conduct."""
 
 
 class LLMOverseerPolicy:
