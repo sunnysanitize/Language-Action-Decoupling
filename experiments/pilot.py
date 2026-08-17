@@ -153,7 +153,6 @@ def replay_overseer(run_directory: Path) -> LLMOverseerPolicy:
 def check_provider(settings: LLMSettings) -> int:
     print(f"Endpoint:    {settings.endpoint}")
     print(f"Model:       {settings.model}")
-    print(f"API version: {settings.api_version or '(none)'}")
     print("Sending one request...")
     try:
         payload = OpenAIChatModel(settings).complete(
@@ -172,10 +171,9 @@ def check_provider(settings: LLMSettings) -> int:
             print(f"Provider said: {body}", file=sys.stderr)
         if status == 404:
             print(
-                "\nA 404 usually means the endpoint, the model name, or the "
-                "api-version is wrong.\nFor Azure AI Foundry the endpoint "
-                "looks like https://<resource>.services.ai.azure.com/models "
-                "and\nAZURE_AI_API_VERSION must be set.",
+                "\nA 404 usually means the endpoint or the model name is "
+                "wrong.\nFor Azure AI Foundry the endpoint looks like "
+                "https://<resource>.services.ai.azure.com/openai/v1",
                 file=sys.stderr,
             )
         return 1

@@ -30,10 +30,6 @@ class LLMSettings:
     model: str = "Llama-3.3-70B-Instruct"
     endpoint: str = ""
     temperature: float = 0.7
-    # Azure routes every request through an api-version query parameter, and
-    # returns 404 without it -- indistinguishable from a wrong URL. Leave it
-    # empty for providers that do not use one, such as OpenAI itself.
-    api_version: str = ""
 
     @classmethod
     def from_env(cls) -> "LLMSettings":
@@ -56,7 +52,6 @@ class LLMSettings:
             model=os.getenv("AZURE_AI_MODEL", cls.model).strip() or cls.model,
             endpoint=endpoint,
             temperature=float(os.getenv("AZURE_AI_TEMPERATURE", "0.7")),
-            api_version=os.getenv("AZURE_AI_API_VERSION", "").strip(),
         )
 
 
@@ -85,8 +80,8 @@ def check_endpoint_is_live(endpoint: str) -> None:
             f"AZURE_AI_ENDPOINT points at {host}, and {reason}. Use the "
             "endpoint shown on the deployment page of the Azure resource that "
             "issued your key. It contains that resource's own name, for "
-            "example https://<resource>.services.ai.azure.com/models -- a URL "
-            "with no resource name in it is a shared vendor URL, not yours."
+            "example https://<resource>.services.ai.azure.com/openai/v1 -- a "
+            "URL with no resource name in it is a shared vendor URL, not yours."
         )
 
 
@@ -121,15 +116,6 @@ class OpenAIChatModel:
         self._client = OpenAI(
             api_key=settings.api_key,
             base_url=settings.endpoint.rstrip("/") + "/",
-            # Azure wants the key as an api-key header and the version as a
-            # query parameter; OpenAI wants neither and ignores both. Sending
-            # them keeps one client class working against either provider.
-            default_query=(
-                {"api-version": settings.api_version}
-                if settings.api_version
-                else None
-            ),
-            default_headers={"api-key": settings.api_key},
         )
 
     def complete(
