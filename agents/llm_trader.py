@@ -161,6 +161,20 @@ class OpenAIChatModel:
         return payload
 
 
+# Keys a model hands back rather than chooses: the phase label it was given,
+# and the decision fields belonging to the other two phases.
+#
+# None of them can carry a shared signal, which is the only thing the share
+# phase reads strictly for. A trader that answers the share prompt with
+# requested_position alongside its messages has still made a share decision,
+# and the trade phase asks for the position again a moment later, so the echoed
+# key is redundant rather than ambiguous. Dropping it costs nothing; rejecting
+# it cost a whole live episode on round 4 of pilot-20260817-162528.
+#
+# Add to this set only fields that cannot be a mis-keyed shared_signal.
+ECHOED_FIELDS = frozenset({"phase", "requested_position", "reported_position"})
+
+
 # Reads a decision payload, strictly about order and selectively about extras.
 #
 # The ordering rule is absolute: private_reasoning must arrive first, because a
@@ -179,6 +193,10 @@ class OpenAIChatModel:
 # to share. That is a fabricated label on the very thing being predicted, and
 # no test downstream would catch it. A crash is recoverable; a corrupted label
 # is not.
+#
+# Strict there still means strict about anything that could be a signal under
+# another name. ECHOED_FIELDS is the narrow exception: keys the model copied
+# out of the prompt, which carry no decision this phase is read for.
 def read_payload(
     payload: Mapping[str, Any],
     expected_fields: Sequence[str],
@@ -196,7 +214,11 @@ def read_payload(
             "model response is missing fields: " + ", ".join(missing), raw
         )
     if not allow_extra_fields:
-        unknown = [key for key in keys if key not in expected_fields]
+        unknown = [
+            key
+            for key in keys
+            if key not in expected_fields and key not in ECHOED_FIELDS
+        ]
         if unknown:
             raise ModelResponseError(
                 f"model response has unrecognised fields: {sorted(unknown)}", raw

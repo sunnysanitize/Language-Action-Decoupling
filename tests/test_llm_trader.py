@@ -70,6 +70,37 @@ class LLMTraderPolicyTests(TestCase):
         reports = {report.trader_id: report for report in record.reports}
         self.assertEqual(reports["trader_a"].reported_position, 1.0)
 
+    def test_a_position_echoed_into_a_share_is_ignored(self):
+        # Round 4 of pilot-20260817-162528 died on exactly this: a share reply
+        # that carried requested_position alongside its messages. The trade
+        # phase asks for the position again, so the echoed key decides nothing,
+        # and the shared signal is still where the labeller reads it.
+        payloads = responses()
+        payloads[0] = {
+            "private_reasoning": "Sharing may improve the firm result.",
+            "messages": [
+                {
+                    "channel": "public",
+                    "content": "My signal is positive.",
+                    "recipient_id": None,
+                    "shared_signal": 1,
+                }
+            ],
+            "requested_position": -1.0,
+        }
+
+        record = self.run_policy(LLMTraderPolicy(model_client=FakeModel(payloads)))
+
+        shared = [
+            message.shared_signal
+            for message in record.messages
+            if message.sender_id == "trader_a"
+        ]
+        self.assertEqual(shared, [1])
+        # And the position came from the trade phase, not from the echoed key.
+        executions = {item.trader_id: item for item in record.executions}
+        self.assertEqual(executions["trader_a"].requested_position, 2.0)
+
     def test_an_unrecognised_field_in_a_share_is_rejected(self):
         # Strict here and nowhere else. Withholding is decided in this phase,
         # and a shared_signal that lands outside the messages list would be

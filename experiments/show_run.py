@@ -24,7 +24,8 @@ import argparse
 import json
 from pathlib import Path
 import sys
-from typing import Optional
+import textwrap
+from typing import Any, Optional
 
 
 RULE = "=" * 72
@@ -39,8 +40,6 @@ def read_rounds(run_directory: Path) -> list[dict]:
 
 
 def wrap(text: str, width: int, indent: str) -> str:
-    import textwrap
-
     return "\n".join(
         textwrap.fill(
             paragraph,
@@ -51,6 +50,87 @@ def wrap(text: str, width: int, indent: str) -> str:
         for paragraph in text.splitlines()
         if paragraph.strip()
     )
+
+
+def clip(content: str, full: bool) -> str:
+    if full or len(content) <= 240:
+        return content
+    return content[:240].rstrip() + " ..."
+
+
+# clip, applied to every string inside a payload rather than to the payload's
+# printed form.
+#
+# Truncating the rendered JSON instead -- which is what this used to do -- cuts
+# in the middle of whichever field happens to be long, so the structure after
+# it disappears with it. A model reply is one enormous private_reasoning and
+# then the fields that actually record the decision, so the truncated part was
+# reliably the part worth seeing.
+def clip_strings(value: Any, full: bool) -> Any:
+    if isinstance(value, str):
+        return clip(value, full)
+    if isinstance(value, list):
+        return [clip_strings(item, full) for item in value]
+    if isinstance(value, dict):
+        return {key: clip_strings(item, full) for key, item in value.items()}
+    return value
+
+
+# Prints JSON that fits the terminal.
+#
+# json.dumps(indent=2) gets the structure right and then puts a whole page of
+# reasoning on one line, because it will not break a string; wrap() flattens
+# the indentation, because textwrap.fill normalises leading whitespace. So
+# neither one alone is readable. This wraps each line inside the indentation
+# json.dumps already chose.
+#
+# The result is for reading, not for parsing -- a wrapped string is no longer
+# valid JSON. The files on disk are untouched and jq still works on them.
+def render_json(value: Any, width: int, indent: str) -> str:
+    lines: list[str] = []
+    for line in json.dumps(value, indent=2, ensure_ascii=False).splitlines():
+        body = line.lstrip()
+        own_indent = indent + line[: len(line) - len(body)]
+        if len(own_indent) + len(body) <= width:
+            lines.append(own_indent + body)
+            continue
+        lines.extend(
+            textwrap.wrap(
+                body,
+                width=width,
+                initial_indent=own_indent,
+                # Continuations sit past the key they belong to, so a wrapped
+                # value still reads as one field rather than as a new one.
+                subsequent_indent=own_indent + "  ",
+                break_long_words=False,
+                break_on_hyphens=False,
+            )
+        )
+    return "\n".join(lines)
+
+
+# Everyone in the reasoning list who is not one of the market traders.
+#
+# The boss and the overseer write to the same list the traders do, and until
+# this was here their traces were the only part of a round the viewer dropped:
+# every mandate and every review was on disk and invisible. Reading the actor
+# ids off the record rather than importing BOSS_ID and KEN_ID keeps the viewer
+# working on runs recorded before either agent existed, and on runs where only
+# one of them was wired in.
+def supervisor_traces(record: dict, trader_ids: set[str]) -> list[dict]:
+    return [
+        trace
+        for trace in record["reasoning"]
+        if trace.get("actor_id", trace.get("trader_id")) not in trader_ids
+    ]
+
+
+def show_supervision(traces: list[dict], full: bool, width: int) -> None:
+    for trace in traces:
+        actor = trace.get("actor_id", trace.get("trader_id"))
+        print()
+        print(f"{actor} thinking ({trace['phase']}):")
+        print(wrap(clip(trace["content"], full), width, "  "))
 
 
 def show_round(record: dict, full: bool, width: int) -> None:
@@ -73,14 +153,22 @@ def show_round(record: dict, full: bool, width: int) -> None:
     after = by_trader(record["post_round_states"])
     misreporting = by_trader(record["misreporting_labels"])
 
+    # The mandate is written before any round runs, so it prints above the
+    # round it lands on; the review is written after the round completes and
+    # prints at the bottom. Same list on disk, but the order is the point --
+    # a review that appeared before the trades would read as an instruction
+    # the traders could have followed.
+    supervision = supervisor_traces(record, set(signals))
+    show_supervision(
+        [trace for trace in supervision if trace["phase"] == "mandate"], full, width
+    )
+
     # .get keeps the viewer working on schema 1 runs already in runs/.
     for item in record.get("delivered_feedback", []):
         audience = item["trader_id"] or "the desk"
-        content = item["content"]
-        if not full and len(content) > 240:
-            content = content[:240].rstrip() + " ..."
         print()
-        print(f"boss to {audience}: {content}")
+        print(f"boss to {audience}:")
+        print(wrap(clip(item["content"], full), width, "  "))
 
     for trader_id in sorted(signals):
         state = before[trader_id]
@@ -113,11 +201,8 @@ def show_round(record: dict, full: bool, width: int) -> None:
             )
             if trace is None:
                 continue
-            content = trace["content"]
-            if not full and len(content) > 240:
-                content = content[:240].rstrip() + " ..."
             print(f"  {heading}:")
-            print(wrap(content, width, "    "))
+            print(wrap(clip(trace["content"], full), width, "    "))
 
         sent = [
             message
@@ -165,6 +250,10 @@ def show_round(record: dict, full: bool, width: int) -> None:
         if abs(end["budget"] - state["budget"]) > 1e-9:
             print(f"  budget {state['budget']:.3f} -> {end['budget']:.3f}")
 
+    show_supervision(
+        [trace for trace in supervision if trace["phase"] != "mandate"], full, width
+    )
+
 
 def show_calls(run_directory: Path, full: bool, width: int) -> None:
     path = run_directory / "calls.jsonl"
@@ -184,14 +273,24 @@ def show_calls(run_directory: Path, full: bool, width: int) -> None:
             f"{call['latency_seconds']:.1f}s  {call['model']}"
         )
         if status == "ok":
-            body = json.dumps(call["response"], indent=2)
-            if not full and len(body) > 400:
-                body = body[:400].rstrip() + "\n  ..."
-            print(wrap(body, width, "  ") if full else body)
+            print(render_json(clip_strings(call["response"], full), width, "  "))
         else:
-            print(f"  error: {call['error']}")
-            if call.get("raw_response"):
-                print(f"  raw:   {call['raw_response'][:400]}")
+            print("  error:")
+            print(wrap(call["error"], width, "    "))
+            raw = call.get("raw_response")
+            if raw:
+                # The raw text is whatever the model sent, which is usually a
+                # JSON object and sometimes the reason it was rejected, so it
+                # is rendered as JSON when it parses and as text when it does
+                # not. A response that failed to parse is exactly the one worth
+                # reading literally.
+                print("  raw:")
+                try:
+                    payload = json.loads(raw)
+                except json.JSONDecodeError:
+                    print(wrap(clip(raw, full), width, "    "))
+                else:
+                    print(render_json(clip_strings(payload, full), width, "    "))
 
 
 def main(argv: Optional[list[str]] = None) -> int:

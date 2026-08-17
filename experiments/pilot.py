@@ -224,6 +224,32 @@ def summarize(result: EpisodeResult) -> str:
         "withheld is the decision to predict; costly is the subset where "
         "sharing would have helped the firm."
     )
+
+    # The supervisors are not in the table above, and an episode where the boss
+    # or the overseer quietly stopped speaking reads exactly like one where they
+    # spoke every round -- the traders still trade either way. Counting what
+    # each of them actually produced is the cheapest way to notice.
+    spoke: dict[tuple[str, str], int] = {}
+    for record in rounds:
+        for trace in record.reasoning:
+            if trace.actor_id in TRADER_IDS:
+                continue
+            key = (trace.actor_id, trace.phase)
+            spoke[key] = spoke.get(key, 0) + 1
+    delivered = {"the desk": 0, **{trader_id: 0 for trader_id in TRADER_IDS}}
+    for record in rounds:
+        for item in record.delivered_feedback:
+            delivered[item.trader_id or "the desk"] += 1
+
+    if spoke or any(delivered.values()):
+        lines.append("")
+        lines.append("supervision")
+        for actor_id, phase in sorted(spoke):
+            lines.append(f"  {actor_id:<14}{phase:<12}{spoke[(actor_id, phase)]}")
+        lines.append(
+            "  feedback delivered: "
+            + ", ".join(f"{name} {count}" for name, count in delivered.items())
+        )
     return "\n".join(lines)
 
 
