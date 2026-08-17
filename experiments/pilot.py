@@ -29,6 +29,7 @@ import time
 from typing import Optional
 
 from agents.boss import BOSS_ID, LLMBossPolicy
+from agents.kengriffin import KEN_ID, LLMOverseerPolicy
 from agents.llm_trader import (
     LLMSettings,
     LLMTraderPolicy,
@@ -120,6 +121,28 @@ def live_boss(
 def replay_boss(run_directory: Path) -> LLMBossPolicy:
     calls = read_calls(run_directory / CALLS_FILENAME)
     return LLMBossPolicy(model_client=ReplayModelClient(calls, tag=BOSS_ID))
+
+
+def live_overseer(
+    config: EpisodeConfig,
+    output_root: Path,
+    settings: LLMSettings,
+) -> LLMOverseerPolicy:
+    calls_path = output_root / config.episode_id / CALLS_FILENAME
+    return LLMOverseerPolicy(
+        model_client=RecordingModelClient(
+            inner=OpenAIChatModel(settings),
+            path=calls_path,
+            settings=settings,
+            tag=KEN_ID,
+        ),
+        settings=settings,
+    )
+
+
+def replay_overseer(run_directory: Path) -> LLMOverseerPolicy:
+    calls = read_calls(run_directory / CALLS_FILENAME)
+    return LLMOverseerPolicy(model_client=ReplayModelClient(calls, tag=KEN_ID))
 
 
 # One throwaway call, to find out whether the provider is configured before
@@ -249,6 +272,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         config = load_config(run_directory)
         policies = replay_policies(run_directory)
         boss = replay_boss(run_directory)
+        overseer = replay_overseer(run_directory)
         output_root = None
         print(f"Replaying {run_directory} ({config.rounds} rounds, no network calls)")
     else:
@@ -266,6 +290,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         run_directory = output_root / config.episode_id
         policies = live_policies(config, output_root, settings)
         boss = live_boss(config, output_root, settings)
+        overseer = live_overseer(config, output_root, settings)
         print(
             f"Running {config.episode_id}: {config.rounds} rounds, "
             f"pressure {config.pressure_level}, model {settings.model}"
@@ -277,7 +302,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     # disk, so the failure is diagnosable rather than just fatal.
     try:
         result = run_episode(
-            config, output_root=output_root, policies=policies, boss=boss
+            config,
+            output_root=output_root,
+            policies=policies,
+            boss=boss,
+            overseer=overseer,
         )
     except ModelResponseError as error:
         print(f"\nThe model broke the response contract: {error}", file=sys.stderr)

@@ -82,7 +82,7 @@ It may explain rank and budget consequences, but it must not invent extra
 rewards, punishments, or private information. Boss-to-trader treatment wording
 should be versioned and held constant within each pressure condition.
 
-## Ken Griffin firm overseer kengriffen.py
+## Ken Griffin firm overseer kengriffin.py
 
 Purpose: represent Ken Griffin as the founder/CEO-level authority at the top of
 a Citadel-style firm hierarchy. He sets firm culture and performance

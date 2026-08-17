@@ -74,8 +74,15 @@ from agents.boss import (
     MandateContext,
     ReviewContext,
     desk_view,
-    firm_directive,
     trader_card,
+)
+from agents.kengriffin import (
+    KEN_ID,
+    OverseerContext,
+    OverseerPolicy,
+    PortfolioView,
+    firm_directive,
+    treatment_text,
 )
 from agents.memory import RoundMemory, trader_memory
 from agents.policy import (
@@ -501,6 +508,7 @@ def run_episode(
     output_root: Optional[Union[str, Path]] = None,
     policies: Optional[Mapping[str, TraderPolicy]] = None,
     boss: Optional[BossPolicy] = None,
+    overseer: Optional[OverseerPolicy] = None,
 ) -> EpisodeResult:
     states = {
         trader_id: TraderState(trader_id, config.initial_budget)
@@ -516,11 +524,24 @@ def run_episode(
 
     # The boss speaks between rounds, never inside one, so the schedule lives
     # here rather than in run_episode_round.
-    directive = firm_directive(config.pressure_level)
+    treatment = treatment_text(config.pressure_level)
+    initial_overseer_reasoning = ""
+    if overseer is not None:
+        decision = overseer.mandate(
+            OverseerContext(treatment, 0, config.rounds)
+        )
+        directive = firm_directive(config.pressure_level, decision.content)
+        initial_overseer_reasoning = decision.private_reasoning
+    else:
+        directive = firm_directive(config.pressure_level)
     pending: dict[str, Tuple[BossFeedback, ...]] = {
         trader_id: () for trader_id in TRADER_IDS
     }
     pending_reasoning: list[ReasoningTrace] = []
+    if initial_overseer_reasoning:
+        pending_reasoning.append(
+            ReasoningTrace(KEN_ID, "mandate", initial_overseer_reasoning)
+        )
     reviewed_through = 0
 
     if boss is not None:
@@ -574,6 +595,29 @@ def run_episode(
         if boss is not None and is_review_round and round_number < config.rounds:
             period = result.rounds[reviewed_through:] + [record]
             completed = result.rounds + [record]
+            if overseer is not None:
+                desk = desk_view(DESK_ID, completed, period)
+                decision = overseer.review(
+                    OverseerContext(
+                        treatment=treatment,
+                        round_number=round_number,
+                        total_rounds=config.rounds,
+                        portfolios=(
+                            PortfolioView(
+                                desk_id=desk.desk_id,
+                                cumulative_pnl=desk.cumulative_pnl,
+                                period_pnl=desk.period_pnl,
+                            ),
+                        ),
+                    )
+                )
+                directive = firm_directive(
+                    config.pressure_level, decision.content
+                )
+                if decision.private_reasoning:
+                    record.reasoning.append(
+                        ReasoningTrace(KEN_ID, "pre_review", decision.private_reasoning)
+                    )
             review = boss.review(
                 ReviewContext(
                     directive=directive,
