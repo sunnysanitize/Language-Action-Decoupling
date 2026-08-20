@@ -306,5 +306,118 @@ class LLMBossTests(unittest.TestCase):
         self.assertNotIn("rank", prompt)
 
 
+class CapitalAuthorityTests(unittest.TestCase):
+    @staticmethod
+    def _context():
+        return ReviewContext(
+            directive=firm_directive(3),
+            round_number=1,
+            desk=desk_view(DESK_ID, [build_round()], [build_round()]),
+            traders=(
+                trader_card("trader_a", [build_round()]),
+                trader_card("trader_b", [build_round()]),
+            ),
+        )
+
+    def test_the_rhetorical_boss_returns_no_allocation(self) -> None:
+        review = ScriptedBossPolicy().review(self._context())
+
+        self.assertEqual(review.allocation, {})
+        self.assertEqual(review.attributed_pnl, {})
+
+    def test_the_capital_boss_returns_an_allocation(self) -> None:
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "trader_a carried the desk.",
+                    "attributed_pnl": {"trader_a": 1.0, "trader_b": -0.5},
+                    "allocation": {"trader_a": 1.5, "trader_b": 0.5},
+                    "feedback": {"trader_a": "Good.", "trader_b": "Improve."},
+                }
+            ]
+        )
+
+        review = LLMBossPolicy(model, capital_authority=True).review(
+            self._context()
+        )
+
+        self.assertEqual(review.allocation, {"trader_a": 1.5, "trader_b": 0.5})
+        self.assertEqual(
+            review.attributed_pnl, {"trader_a": 1.0, "trader_b": -0.5}
+        )
+        self.assertEqual(review.feedback["trader_a"], "Good.")
+
+    def test_the_capital_boss_uses_its_own_system_prompt(self) -> None:
+        from agents.prompts import BOSS_CAPITAL_SYSTEM_PROMPT, BOSS_SYSTEM_PROMPT
+
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Even split.",
+                    "attributed_pnl": {"trader_a": 0.0, "trader_b": 0.0},
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+        system_prompt = model.calls[0][0]
+        self.assertEqual(system_prompt, BOSS_CAPITAL_SYSTEM_PROMPT)
+        self.assertNotEqual(system_prompt, BOSS_SYSTEM_PROMPT)
+
+    def test_an_allocation_omitting_a_trader_is_rejected(self) -> None:
+        # Unlike feedback, where an absent trader legitimately means "told
+        # nothing this cycle", an absent allocation is indistinguishable from
+        # a formatting failure and would silently read as zero capital.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Only one matters.",
+                    "attributed_pnl": {"trader_a": 1.0, "trader_b": 0.0},
+                    "allocation": {"trader_a": 2.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+    def test_reasoning_must_still_come_first(self) -> None:
+        model = FakeModel(
+            [
+                {
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "private_reasoning": "Written afterwards.",
+                    "attributed_pnl": {"trader_a": 0.0, "trader_b": 0.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+    def test_attribution_must_precede_allocation(self) -> None:
+        # Attribution sampled after the split would be a rationalisation of a
+        # decision already made, which is the same reason private_reasoning
+        # comes first.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Deciding.",
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "attributed_pnl": {"trader_a": 0.0, "trader_b": 0.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+
 if __name__ == "__main__":
     unittest.main()
