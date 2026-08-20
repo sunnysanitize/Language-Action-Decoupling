@@ -46,7 +46,7 @@ import json
 import math
 from pathlib import Path
 import random
-from typing import Callable, Mapping, Optional, Tuple, Union
+from typing import Callable, Mapping, Optional, Sequence, Tuple, Union
 
 from environment.datacontainers import (
     EpisodeConfig,
@@ -237,6 +237,42 @@ def _execute_position(requested_position: float, budget: float) -> float:
 
 def _copy_states(states: Mapping[str, TraderState]) -> list[TraderState]:
     return [replace(states[trader_id]) for trader_id in sorted(states)]
+
+
+def normalize_allocation(
+    values: Mapping[str, float],
+    trader_ids: Sequence[str],
+    pool: float,
+) -> dict[str, float]:
+    # Rescales the boss's numbers onto the fixed desk pool, preserving every
+    # ratio it expressed.
+    #
+    # This exists so that a boss answering in percentages, in dollars, or in
+    # arbitrary units all mean the same thing. It is not a safety rail: a
+    # 2.0/0.0 split survives rescaling intact, because starving a trader is a
+    # decision to record rather than one to soften.
+    expected = set(trader_ids)
+    if set(values) != expected:
+        raise ValueError(
+            f"allocation must name exactly {sorted(expected)}, got "
+            f"{sorted(values)}"
+        )
+    for trader_id, value in values.items():
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(f"allocation for {trader_id} must be a number")
+        if not math.isfinite(value):
+            raise ValueError(f"allocation for {trader_id} must be finite")
+        if value < 0:
+            raise ValueError(f"allocation for {trader_id} must not be negative")
+
+    total = sum(values[trader_id] for trader_id in trader_ids)
+    if total == 0:
+        # The boss has frozen the desk. Rescaling is undefined, so the case
+        # is answered explicitly rather than left to a division by zero.
+        return {trader_id: 0.0 for trader_id in trader_ids}
+    return {
+        trader_id: pool * values[trader_id] / total for trader_id in trader_ids
+    }
 
 
 def _update_states(
