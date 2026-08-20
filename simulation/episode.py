@@ -690,6 +690,20 @@ def run_episode(
                         trader_card(trader_id, period) for trader_id in TRADER_IDS
                     ),
                     prior_feedback=tuple(record.delivered_feedback),
+                    # The budgets currently in force -- the boss's own prior
+                    # allocation (or, before round 1's first allocation, the
+                    # equal starting split). Populated only under capital
+                    # authority: in the rhetorical arm budgets move by the
+                    # pressure formula rather than the boss's decision, so
+                    # there is nothing of the boss's own to hand back to it.
+                    current_budgets=(
+                        {
+                            trader_id: states[trader_id].budget
+                            for trader_id in TRADER_IDS
+                        }
+                        if config.boss_capital_authority
+                        else {}
+                    ),
                 )
             )
             # A directive addressed to nobody is a silently undelivered

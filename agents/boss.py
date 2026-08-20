@@ -91,6 +91,19 @@ class ReviewContext:
     desk: DeskView
     traders: Tuple[TraderCard, ...]
     prior_feedback: Tuple[BossFeedback, ...] = ()
+    # The budgets currently in force -- the ones the boss itself allocated at
+    # its last review (or, before round 1's first allocation, the equal
+    # starting split). Empty in the rhetorical arm, where budgets move by the
+    # pressure formula and are not the boss's decision to compare against.
+    #
+    # Populated only under boss_capital_authority. Each model call is
+    # stateless and normalize_allocation (simulation/episode.py) rescales
+    # whatever ratios the boss returns, so without this field the boss could
+    # never learn the pool's magnitude and could not compare a trader's claim
+    # against the ceiling that was actually in force when the claim was made.
+    # This leaks nothing forbidden: it is the boss's own prior decision, not
+    # per-trader profit, executed positions, ranks, or the market return.
+    current_budgets: Mapping[str, float] = field(default_factory=dict)
 
 
 # private_reasoning comes first on both decisions for the same reason it does
@@ -279,6 +292,7 @@ class LLMBossPolicy:
 
     def review(self, context: ReviewContext) -> BossReview:
         trader_ids = [card.trader_id for card in context.traders]
+        prompt_context = self._prompt_context(context)
         if self.capital_authority:
             fields: tuple[str, ...] = (
                 "private_reasoning",
@@ -315,11 +329,16 @@ class LLMBossPolicy:
                     for trader_id in trader_ids
                 },
             }
+            # current_budgets is the boss's own prior allocation, meaningful
+            # only when the boss has authority to act on it. Dropping it here
+            # keeps the rhetorical arm's prompt exactly what it was before
+            # that field existed.
+            prompt_context.pop("current_budgets", None)
 
         payload = self._complete(
             {
                 "phase": "review",
-                "context": self._prompt_context(context),
+                "context": prompt_context,
                 "response_fields_in_order": response_shape,
             },
             fields,
@@ -347,6 +366,19 @@ class LLMBossPolicy:
             )
 
         attributed = _number_map(payload["attributed_pnl"], "attributed_pnl", raw)
+        # A hallucinated trader id here would be recorded on the
+        # CapitalAllocation and read straight into analysis as if it named a
+        # real desk member. Unlike an omission (a trader legitimately left
+        # out of the attribution) or a negative value (a trader can genuinely
+        # have lost money), an unknown id names nobody and cannot be a
+        # decision the boss made about the desk.
+        unknown_attribution = set(attributed) - known
+        if unknown_attribution:
+            raise ModelResponseError(
+                f"attributed_pnl names traders outside the desk: "
+                f"{sorted(unknown_attribution)}",
+                raw,
+            )
         allocation = _number_map(
             payload["allocation"], "allocation", raw, reject_negative=True
         )

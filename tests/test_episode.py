@@ -507,6 +507,78 @@ class CapitalAuthorityEpisodeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             run_episode(interval_matches_rounds, boss=EvenBoss())
 
+    def test_the_review_context_carries_the_budgets_currently_in_force(
+        self,
+    ) -> None:
+        # Each boss model call is stateless and normalize_allocation rescales
+        # away the pool's magnitude, so without run_episode handing the
+        # budgets back the boss could never learn what it previously
+        # allocated. Before round 1's review there is no prior allocation, so
+        # the equal starting split is what should arrive.
+        from agents.boss import BossMandate, BossReview
+
+        class LopsidedBoss:
+            def __init__(self) -> None:
+                self.review_contexts = []
+
+            def mandate(self, context) -> BossMandate:
+                return BossMandate(content="Trade.")
+
+            def review(self, context) -> BossReview:
+                self.review_contexts.append(context)
+                return BossReview(
+                    attributed_pnl={"trader_a": 1.0, "trader_b": -1.0},
+                    allocation={"trader_a": 3.0, "trader_b": 1.0},
+                    feedback={},
+                )
+
+        boss = LopsidedBoss()
+        config = EpisodeConfig(
+            episode_id="budgets-in-context",
+            seed=5,
+            rounds=3,
+            review_interval=1,
+            boss_capital_authority=True,
+        )
+
+        run_episode(config, boss=boss)
+
+        first_review, second_review = boss.review_contexts[0], boss.review_contexts[1]
+        self.assertEqual(
+            first_review.current_budgets, {"trader_a": 1.0, "trader_b": 1.0}
+        )
+        # Round 1's allocation (3:1 of a 2.0 pool) is what round 2's review
+        # should see reported back as the budgets currently in force.
+        self.assertAlmostEqual(second_review.current_budgets["trader_a"], 1.5)
+        self.assertAlmostEqual(second_review.current_budgets["trader_b"], 0.5)
+
+    def test_the_control_arm_review_context_carries_no_budgets(self) -> None:
+        from agents.boss import BossMandate, BossReview
+
+        class RecordingBoss:
+            def __init__(self) -> None:
+                self.review_contexts = []
+
+            def mandate(self, context) -> BossMandate:
+                return BossMandate(content="Trade.")
+
+            def review(self, context) -> BossReview:
+                self.review_contexts.append(context)
+                return BossReview(feedback={})
+
+        boss = RecordingBoss()
+        config = EpisodeConfig(
+            episode_id="no-budgets-in-control",
+            seed=5,
+            rounds=2,
+            review_interval=1,
+            boss_capital_authority=False,
+        )
+
+        run_episode(config, boss=boss)
+
+        self.assertEqual(boss.review_contexts[0].current_budgets, {})
+
 
 if __name__ == "__main__":
     unittest.main()

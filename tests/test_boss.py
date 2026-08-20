@@ -1,6 +1,6 @@
 import json
 import unittest
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 from agents.boss import (
     DESK_ID,
@@ -435,6 +435,126 @@ class CapitalAuthorityTests(unittest.TestCase):
 
         with self.assertRaises(ModelResponseError):
             LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+    def test_an_attributed_pnl_naming_a_trader_outside_the_desk_is_rejected(
+        self,
+    ) -> None:
+        # A hallucinated id here would be recorded on the CapitalAllocation and
+        # read straight into analysis as if it named a real desk member.
+        # feedback and allocation already reject this; attributed_pnl must
+        # match.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Crediting a ghost.",
+                    "attributed_pnl": {"trader_a": 1.0, "trader_z": -1.0},
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+    def test_attributed_pnl_still_permits_negative_values_and_omission(
+        self,
+    ) -> None:
+        # A trader can genuinely have lost money, and a trader left out of the
+        # attribution is a decision the boss is allowed to make -- only an
+        # unknown id is a defect.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "trader_b lost money; trader_a untouched.",
+                    "attributed_pnl": {"trader_b": -0.75},
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        review = LLMBossPolicy(model, capital_authority=True).review(
+            self._context()
+        )
+
+        self.assertEqual(review.attributed_pnl, {"trader_b": -0.75})
+
+    def test_the_capital_boss_prompt_carries_the_current_budgets(self) -> None:
+        # Each model call is stateless and normalize_allocation rescales
+        # whatever ratios the boss returns, so without this the boss could
+        # never learn the pool's magnitude or compare a claim against a
+        # ceiling. The budgets it previously allocated must reach the prompt.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Even split.",
+                    "attributed_pnl": {"trader_a": 0.0, "trader_b": 0.0},
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+        context = replace(
+            self._context(),
+            current_budgets={"trader_a": 1.3, "trader_b": 0.7},
+        )
+
+        LLMBossPolicy(model, capital_authority=True).review(context)
+
+        prompt_context = model.calls[0][1]["context"]
+        self.assertEqual(
+            prompt_context["current_budgets"],
+            {"trader_a": 1.3, "trader_b": 0.7},
+        )
+
+    def test_the_rhetorical_boss_prompt_is_unchanged_by_current_budgets(
+        self,
+    ) -> None:
+        # current_budgets is populated by run_episode only under capital
+        # authority. Even if a caller passes it anyway, the rhetorical arm's
+        # prompt must not carry it -- budgets in that arm move by the
+        # pressure formula, not a boss decision.
+        model = FakeModel(
+            [{"private_reasoning": "ok", "feedback": {"trader_a": "fine"}}]
+        )
+        context = replace(
+            self._context(),
+            current_budgets={"trader_a": 1.3, "trader_b": 0.7},
+        )
+
+        LLMBossPolicy(model, capital_authority=False).review(context)
+
+        prompt_context = model.calls[0][1]["context"]
+        self.assertNotIn("current_budgets", prompt_context)
+
+    def test_the_capital_boss_prompt_never_carries_ground_truth(self) -> None:
+        # The leak-regression counterpart to
+        # LLMBossTests.test_the_boss_prompt_never_carries_ground_truth. After
+        # current_budgets was added the prompt legitimately contains numbers,
+        # so this asserts on the forbidden fields specifically rather than on
+        # the presence of any number.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "ok",
+                    "attributed_pnl": {"trader_a": 0.0, "trader_b": 0.0},
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+        context = replace(
+            self._context(),
+            current_budgets={"trader_a": 1.3, "trader_b": 0.7},
+        )
+
+        LLMBossPolicy(model, capital_authority=True).review(context)
+
+        prompt = json.dumps(model.calls[0][1])
+        self.assertNotIn("executed", prompt)
+        self.assertNotIn("realized_return", prompt)
+        self.assertNotIn("rank", prompt)
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
-from experiments.dataset import TRADER_IDS, load_sweep
+from experiments.dataset import load_sweep
 
 
 def _allocations(episodes) -> list[tuple[dict[str, Any], dict[str, Any]]]:
