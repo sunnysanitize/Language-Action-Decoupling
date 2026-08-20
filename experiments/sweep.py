@@ -42,6 +42,7 @@ class EpisodeJob:
     seed: int
     rounds: int
     review_interval: int
+    boss_capital_authority: bool = False
 
 
 @dataclass
@@ -68,6 +69,7 @@ def build_jobs(arguments: argparse.Namespace) -> list[EpisodeJob]:
                     seed=seed,
                     rounds=arguments.rounds,
                     review_interval=arguments.review_interval,
+                    boss_capital_authority=arguments.boss_capital_authority,
                 )
             )
     return jobs
@@ -97,6 +99,8 @@ def run_one(job: EpisodeJob, sweep_root: Path, attempts: int) -> EpisodeOutcome:
         "--output-root",
         str(sweep_root),
     ]
+    if job.boss_capital_authority:
+        command.append("--boss-capital-authority")
 
     started = time.monotonic()
     last_error = ""
@@ -158,6 +162,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--seeds", type=int, default=12)
     parser.add_argument("--seed-start", type=int, default=1001)
     parser.add_argument("--review-interval", type=int, default=1)
+    parser.add_argument(
+        "--boss-capital-authority",
+        action="store_true",
+        help="run the capital-authority arm instead of the rhetorical boss",
+    )
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--attempts", type=int, default=3)
     parser.add_argument("--output-root", default="runs")
@@ -204,6 +213,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "seeds": [arguments.seed_start + offset for offset in range(arguments.seeds)],
         "pressure_levels": list(PRESSURE_LEVELS),
         "review_interval": arguments.review_interval,
+        "boss_capital_authority": arguments.boss_capital_authority,
         "workers": arguments.workers,
         "wall_seconds": round(time.monotonic() - started, 1),
         "episodes": [asdict(item) for item in outcomes],

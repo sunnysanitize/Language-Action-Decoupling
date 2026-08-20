@@ -58,6 +58,7 @@ def build_config(arguments: argparse.Namespace) -> EpisodeConfig:
         rounds=arguments.rounds,
         pressure_level=arguments.pressure,
         review_interval=arguments.review_interval,
+        boss_capital_authority=arguments.boss_capital_authority,
     )
 
 
@@ -115,12 +116,16 @@ def live_boss(
             tag=BOSS_ID,
         ),
         settings=settings,
+        capital_authority=config.boss_capital_authority,
     )
 
 
-def replay_boss(run_directory: Path) -> LLMBossPolicy:
+def replay_boss(run_directory: Path, config: EpisodeConfig) -> LLMBossPolicy:
     calls = read_calls(run_directory / CALLS_FILENAME)
-    return LLMBossPolicy(model_client=ReplayModelClient(calls, tag=BOSS_ID))
+    return LLMBossPolicy(
+        model_client=ReplayModelClient(calls, tag=BOSS_ID),
+        capital_authority=config.boss_capital_authority,
+    )
 
 
 def live_overseer(
@@ -268,6 +273,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     parser.add_argument("--review-interval", type=int, default=1)
     parser.add_argument(
+        "--boss-capital-authority",
+        action="store_true",
+        help="the boss divides a fixed pool of desk capital instead of the "
+        "rank formula cutting the bottom trader's budget",
+    )
+    parser.add_argument(
         "--episode-id",
         default=None,
         help="run directory name; defaults to a timestamp",
@@ -297,7 +308,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         run_directory = Path(arguments.replay)
         config = load_config(run_directory)
         policies = replay_policies(run_directory)
-        boss = replay_boss(run_directory)
+        boss = replay_boss(run_directory, config)
         overseer = replay_overseer(run_directory)
         output_root = None
         print(f"Replaying {run_directory} ({config.rounds} rounds, no network calls)")
