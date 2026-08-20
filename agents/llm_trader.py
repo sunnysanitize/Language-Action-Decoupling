@@ -2,6 +2,8 @@ from dataclasses import asdict, dataclass
 import json
 import math
 import os
+import random
+import time
 from typing import Any, Mapping, Optional, Protocol, Sequence
 
 from agents.policy import (
@@ -35,6 +37,13 @@ class LLMSettings:
     # returns 404 without it -- indistinguishable from a wrong URL. Leave it
     # empty for providers that do not use one, such as OpenAI itself.
     api_version: str = ""
+    # Rate-limit backoff. These are transport settings, not sampling settings:
+    # they change how long a call waits, never what the model is asked or how
+    # it answers, so they are not part of what agents/recording.py records as
+    # the experimental condition.
+    retry_attempts: int = 6
+    retry_initial_seconds: float = 4.0
+    retry_max_seconds: float = 60.0
 
     @classmethod
     def from_env(cls) -> "LLMSettings":
@@ -133,20 +142,53 @@ class OpenAIChatModel:
             default_headers={"api-key": settings.api_key},
         )
 
+    # Retries only the provider's rate limit, and nothing else.
+    #
+    # A 429 is the provider saying "later", not a result. Episodes get more
+    # expensive as they run -- a trader's memory grows every round, so round 10
+    # sends several times the tokens of round 1 -- and a sweep of parallel
+    # episodes therefore crosses the tokens-per-minute ceiling late in a run,
+    # after eighty calls have already been paid for. Letting that end the
+    # episode throws all of them away and biases the sweep toward whichever
+    # episodes happened to run when the account was quiet.
+    #
+    # Deliberately narrow. A malformed response is data about the model and
+    # must not be retried away; a 401 or a 404 is a configuration error that
+    # will fail identically forever. Only RateLimitError waits and tries again.
+    def _create_with_backoff(self, system_prompt: str, user_prompt: str):
+        from openai import RateLimitError
+
+        delay = self._settings.retry_initial_seconds
+        last_error: Optional[Exception] = None
+        for attempt in range(self._settings.retry_attempts):
+            try:
+                return self._client.chat.completions.create(
+                    model=self._settings.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=self._settings.temperature,
+                    response_format={"type": "json_object"},
+                )
+            except RateLimitError as error:
+                last_error = error
+                if attempt == self._settings.retry_attempts - 1:
+                    break
+                # Jitter, because every episode in a sweep hits the ceiling at
+                # roughly the same moment. Backing off by an identical amount
+                # would send them all back in the same instant and reproduce
+                # the burst that caused the 429.
+                time.sleep(delay * (1.0 + random.random()))
+                delay = min(delay * 2, self._settings.retry_max_seconds)
+        raise last_error  # type: ignore[misc]
+
     def complete(
         self,
         system_prompt: str,
         user_prompt: str,
     ) -> Mapping[str, Any]:
-        response = self._client.chat.completions.create(
-            model=self._settings.model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=self._settings.temperature,
-            response_format={"type": "json_object"},
-        )
+        response = self._create_with_backoff(system_prompt, user_prompt)
         content = response.choices[0].message.content
         if not content:
             raise ModelResponseError("model returned an empty response", content)
