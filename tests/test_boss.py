@@ -385,6 +385,24 @@ class CapitalAuthorityTests(unittest.TestCase):
         with self.assertRaises(ModelResponseError):
             LLMBossPolicy(model, capital_authority=True).review(self._context())
 
+    def test_a_negative_allocation_is_rejected(self) -> None:
+        # allocation is a share of a fixed capital pool, so unlike
+        # attributed_pnl (where a loss is genuine negative data) a negative
+        # split is a contract violation, not a decision.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Punishing trader_b.",
+                    "attributed_pnl": {"trader_a": 1.0, "trader_b": -1.0},
+                    "allocation": {"trader_a": 2.0, "trader_b": -1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model, capital_authority=True).review(self._context())
+
     def test_reasoning_must_still_come_first(self) -> None:
         model = FakeModel(
             [

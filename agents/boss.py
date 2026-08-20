@@ -199,7 +199,9 @@ class ScriptedBossPolicy:
         )
 
 
-def _number_map(value: Any, field_name: str, raw: str) -> dict[str, float]:
+def _number_map(
+    value: Any, field_name: str, raw: str, *, reject_negative: bool = False
+) -> dict[str, float]:
     if not isinstance(value, dict):
         raise ModelResponseError(f"{field_name} must be an object", raw)
     result: dict[str, float] = {}
@@ -211,6 +213,15 @@ def _number_map(value: Any, field_name: str, raw: str) -> dict[str, float]:
         if not math.isfinite(float(item)):
             raise ModelResponseError(
                 f"{field_name}[{key}] must be finite", raw
+            )
+        # attributed_pnl may be negative -- a trader can genuinely have lost
+        # money. allocation is a share of a fixed capital pool and
+        # normalize_allocation (simulation/episode.py) raises a plain
+        # ValueError on negatives, so this must fail loudly here as a
+        # ModelResponseError instead of surfacing mid-episode.
+        if reject_negative and float(item) < 0:
+            raise ModelResponseError(
+                f"{field_name}[{key}] must not be negative", raw
             )
         result[key] = float(item)
     return result
@@ -336,7 +347,9 @@ class LLMBossPolicy:
             )
 
         attributed = _number_map(payload["attributed_pnl"], "attributed_pnl", raw)
-        allocation = _number_map(payload["allocation"], "allocation", raw)
+        allocation = _number_map(
+            payload["allocation"], "allocation", raw, reject_negative=True
+        )
         # Strict where feedback is lenient. An absent trader in feedback means
         # "told nothing this cycle"; an absent trader in allocation is
         # indistinguishable from a formatting failure and would silently mean
