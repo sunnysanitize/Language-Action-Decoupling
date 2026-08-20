@@ -254,5 +254,155 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(result.rounds[0].capital_allocations, [])
 
 
+class CapitalAuthorityEpisodeTests(unittest.TestCase):
+    def test_the_boss_allocation_sets_the_next_rounds_budgets(self) -> None:
+        from agents.boss import BossMandate, BossReview
+
+        class LopsidedBoss:
+            def mandate(self, context) -> BossMandate:
+                return BossMandate(content="Trade.")
+
+            def review(self, context) -> BossReview:
+                return BossReview(
+                    attributed_pnl={"trader_a": 1.0, "trader_b": -1.0},
+                    allocation={"trader_a": 3.0, "trader_b": 1.0},
+                    feedback={},
+                )
+
+        config = EpisodeConfig(
+            episode_id="lopsided",
+            seed=5,
+            rounds=2,
+            boss_capital_authority=True,
+        )
+
+        result = run_episode(config, boss=LopsidedBoss())
+
+        budgets = {
+            state.trader_id: state.budget
+            for state in result.rounds[1].pre_round_states
+        }
+        # Pool is initial_budget * 2 = 2.0, split 3:1.
+        self.assertAlmostEqual(budgets["trader_a"], 1.5)
+        self.assertAlmostEqual(budgets["trader_b"], 0.5)
+
+    def test_the_pressure_multiplier_does_not_fire_under_capital_authority(
+        self,
+    ) -> None:
+        from agents.boss import BossMandate, BossReview
+
+        class EvenBoss:
+            def mandate(self, context) -> BossMandate:
+                return BossMandate(content="Trade.")
+
+            def review(self, context) -> BossReview:
+                return BossReview(
+                    attributed_pnl={"trader_a": 0.0, "trader_b": 0.0},
+                    allocation={"trader_a": 1.0, "trader_b": 1.0},
+                    feedback={},
+                )
+
+        # Pressure 4 would quarter the bottom trader's budget in the control
+        # arm. Under capital authority the boss is the only thing that moves
+        # capital, so an even split must leave both on 1.0.
+        config = EpisodeConfig(
+            episode_id="nopressure",
+            seed=5,
+            rounds=2,
+            pressure_level=4,
+            boss_capital_authority=True,
+        )
+
+        result = run_episode(config, boss=EvenBoss())
+
+        budgets = {
+            state.trader_id: state.budget
+            for state in result.rounds[1].pre_round_states
+        }
+        self.assertAlmostEqual(budgets["trader_a"], 1.0)
+        self.assertAlmostEqual(budgets["trader_b"], 1.0)
+
+    def test_a_zeroed_trader_still_produces_a_full_round(self) -> None:
+        from agents.boss import BossMandate, BossReview
+
+        class StarvingBoss:
+            def mandate(self, context) -> BossMandate:
+                return BossMandate(content="Trade.")
+
+            def review(self, context) -> BossReview:
+                return BossReview(
+                    attributed_pnl={"trader_a": 1.0, "trader_b": -1.0},
+                    allocation={"trader_a": 1.0, "trader_b": 0.0},
+                    feedback={},
+                )
+
+        config = EpisodeConfig(
+            episode_id="starved",
+            seed=5,
+            rounds=2,
+            boss_capital_authority=True,
+        )
+
+        result = run_episode(config, boss=StarvingBoss())
+        second = result.rounds[1]
+
+        starved = {
+            state.trader_id: state.budget for state in second.pre_round_states
+        }["trader_b"]
+        executed = {
+            item.trader_id: item.executed_position for item in second.executions
+        }["trader_b"]
+        reported = [
+            item.trader_id for item in second.reports
+        ]
+
+        self.assertEqual(starved, 0.0)
+        self.assertEqual(executed, 0.0)
+        # Frozen out of trading, still present in the record.
+        self.assertIn("trader_b", reported)
+
+    def test_the_allocation_is_recorded_on_the_round(self) -> None:
+        from agents.boss import BossMandate, BossReview
+
+        class EvenBoss:
+            def mandate(self, context) -> BossMandate:
+                return BossMandate(content="Trade.")
+
+            def review(self, context) -> BossReview:
+                return BossReview(
+                    attributed_pnl={"trader_a": 2.0, "trader_b": -1.0},
+                    allocation={"trader_a": 1.0, "trader_b": 1.0},
+                    feedback={},
+                )
+
+        config = EpisodeConfig(
+            episode_id="recorded",
+            seed=5,
+            rounds=2,
+            boss_capital_authority=True,
+        )
+
+        result = run_episode(config, boss=EvenBoss())
+        allocations = result.rounds[0].capital_allocations
+
+        self.assertEqual(len(allocations), 1)
+        self.assertEqual(
+            allocations[0].attributed_pnl, {"trader_a": 2.0, "trader_b": -1.0}
+        )
+        self.assertEqual(
+            allocations[0].allocated_budget, {"trader_a": 1.0, "trader_b": 1.0}
+        )
+
+    def test_capital_authority_without_a_boss_is_refused(self) -> None:
+        # Nothing would move capital, so budgets would sit flat for the whole
+        # episode and the run would silently be neither arm.
+        config = EpisodeConfig(
+            episode_id="bossless", seed=5, rounds=2, boss_capital_authority=True
+        )
+
+        with self.assertRaises(ValueError):
+            run_episode(config)
+
+
 if __name__ == "__main__":
     unittest.main()

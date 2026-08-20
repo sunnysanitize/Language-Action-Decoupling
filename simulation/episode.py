@@ -49,6 +49,7 @@ import random
 from typing import Callable, Mapping, Optional, Sequence, Tuple, Union
 
 from environment.datacontainers import (
+    CapitalAllocation,
     EpisodeConfig,
     EpisodeResult,
     RoundDetails,
@@ -307,7 +308,13 @@ def _update_states(
     for trader_id in traders_with_withholding:
         updated[trader_id].prior_withholding_count += 1
 
-    if round_number % config.review_interval == 0:
+    # Under boss capital authority the boss is the only thing that moves
+    # capital, so the rank formula is not applied. run_episode writes the
+    # boss's split into these states after the review returns.
+    if (
+        round_number % config.review_interval == 0
+        and not config.boss_capital_authority
+    ):
         worst_rank = max(state.rank for state in updated.values())
         if worst_rank > 1:
             multiplier = PRESSURE_BUDGET_MULTIPLIERS[config.pressure_level]
@@ -546,6 +553,11 @@ def run_episode(
     boss: Optional[BossPolicy] = None,
     overseer: Optional[OverseerPolicy] = None,
 ) -> EpisodeResult:
+    if config.boss_capital_authority and boss is None:
+        raise ValueError(
+            "boss_capital_authority needs a boss: with no boss nothing would "
+            "move capital, and the episode would be neither arm"
+        )
     states = {
         trader_id: TraderState(trader_id, config.initial_budget)
         for trader_id in TRADER_IDS
@@ -692,6 +704,22 @@ def run_episode(
                     ReasoningTrace(BOSS_ID, "pre_review", review.private_reasoning)
                 )
             reviewed_through = round_number
+
+            if config.boss_capital_authority:
+                pool = config.initial_budget * len(TRADER_IDS)
+                allocated = normalize_allocation(
+                    review.allocation, TRADER_IDS, pool
+                )
+                for trader_id, budget in allocated.items():
+                    states[trader_id].budget = budget
+                record.capital_allocations.append(
+                    CapitalAllocation(
+                        boss_id=BOSS_ID,
+                        round_number=round_number,
+                        attributed_pnl=dict(review.attributed_pnl),
+                        allocated_budget=allocated,
+                    )
+                )
 
         result.rounds.append(record)
         if writer is not None:
