@@ -141,7 +141,7 @@ class EpisodeJSONLWriter:
         self.rounds_path = self.run_directory / "rounds.jsonl"
 
         metadata = {
-            "schema_version": 2,
+            "schema_version": 3,
             "config": asdict(config),
             "pressure_budget_multiplier": (
                 PRESSURE_BUDGET_MULTIPLIERS[config.pressure_level]

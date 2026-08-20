@@ -187,7 +187,9 @@ class EpisodeTests(unittest.TestCase):
 
         # Version 2 renamed ReasoningTrace.trader_id to actor_id and added
         # delivered_feedback, so a schema 1 reader cannot parse these rounds.
-        self.assertEqual(metadata["schema_version"], 2)
+        # Version 3 added capital_allocations, so a schema 2 reader cannot
+        # parse these rounds either.
+        self.assertEqual(metadata["schema_version"], 3)
         self.assertEqual(metadata["config"]["pressure_level"], 2)
         self.assertEqual(len(lines), 2)
         self.assertEqual(json.loads(lines[0])["round_number"], 1)
@@ -227,6 +229,29 @@ class ControlArmTests(unittest.TestCase):
             for value in row.values():
                 self.assertGreater(value, 0.0)
                 self.assertLessEqual(value, 1.0)
+
+
+class SchemaTests(unittest.TestCase):
+    def test_metadata_declares_schema_three_and_the_condition(self) -> None:
+        import json
+        import tempfile
+        from pathlib import Path
+
+        config = EpisodeConfig(episode_id="schema", seed=3, rounds=1)
+        with tempfile.TemporaryDirectory() as directory:
+            run_episode(config, output_root=directory)
+            path = Path(directory) / "schema" / "metadata.json"
+            metadata = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertEqual(metadata["schema_version"], 3)
+        self.assertFalse(metadata["config"]["boss_capital_authority"])
+
+    def test_control_arm_rounds_carry_an_empty_allocation_list(self) -> None:
+        config = EpisodeConfig(episode_id="empty", seed=3, rounds=1)
+
+        result = run_episode(config)
+
+        self.assertEqual(result.rounds[0].capital_allocations, [])
 
 
 if __name__ == "__main__":

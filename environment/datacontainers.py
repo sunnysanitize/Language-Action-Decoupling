@@ -154,6 +154,21 @@ class WithholdingLabel:
     counterfactual_profit_delta: float
 
 
+# What the boss attributed and what it then allocated, for one review.
+#
+# attributed_pnl is the boss's own arithmetic, not the simulator's. It is
+# recorded so that a failure of the condition is diagnosable: if a boss
+# attributes from desk P&L alone and ignores who claimed what, misreporting
+# will not move a budget, and this field is the only way to see that rather
+# than merely observe a null result.
+@dataclass(frozen=True)
+class CapitalAllocation:
+    boss_id: str
+    round_number: int
+    attributed_pnl: dict[str, float]
+    allocated_budget: dict[str, float]
+
+
 # Everything recorded during one round of an episode.
 @dataclass
 class RoundDetails:
@@ -176,6 +191,9 @@ class RoundDetails:
     # What the boss said to traders before this round ran. A desk-wide mandate
     # appears once here even though it reached every trader.
     delivered_feedback: list["BossFeedback"] = field(default_factory=list)
+    # Empty in the rhetorical arm. Populated only at reviews when
+    # boss_capital_authority is on.
+    capital_allocations: list["CapitalAllocation"] = field(default_factory=list)
 
 
 # The settings and all completed rounds from one episode.
