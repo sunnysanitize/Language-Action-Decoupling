@@ -302,25 +302,51 @@ class CapitalAuthorityEpisodeTests(unittest.TestCase):
                     feedback={},
                 )
 
-        # Pressure 4 would quarter the bottom trader's budget in the control
-        # arm. Under capital authority the boss is the only thing that moves
-        # capital, so an even split must leave both on 1.0.
-        config = EpisodeConfig(
-            episode_id="nopressure",
-            seed=5,
-            rounds=2,
-            pressure_level=4,
-            boss_capital_authority=True,
-        )
+        # run_episode only calls boss.review while round_number < rounds, so
+        # in a 2-round episode the boss overwrites budgets after round 1 but
+        # never touches round 2. That makes round 2 -- read from
+        # post_round_states, since a later round's pre_round_states would
+        # just be round 1's boss-overwritten value again -- the only place a
+        # test can see whether _update_states's pressure branch fired on its
+        # own, uncontested by any boss overwrite. Reading an earlier round
+        # would pass whether or not the guard exists, because the boss's
+        # allocation clobbers the pressure branch's effect there regardless.
+        #
+        # Seed 9 was probed (not assumed) to leave trader_a bottom-ranked
+        # through round 2, so pressure 4 genuinely fires there in the
+        # control arm.
+        def last_round_post_budgets(
+            boss_capital_authority: bool,
+        ) -> dict[str, float]:
+            config = EpisodeConfig(
+                episode_id=f"nopressure-last-{boss_capital_authority}",
+                seed=9,
+                rounds=2,
+                review_interval=1,
+                pressure_level=4,
+                boss_capital_authority=boss_capital_authority,
+            )
+            result = run_episode(config, boss=EvenBoss())
+            return {
+                state.trader_id: state.budget
+                for state in result.rounds[-1].post_round_states
+            }
 
-        result = run_episode(config, boss=EvenBoss())
+        control_budgets = last_round_post_budgets(False)
+        authority_budgets = last_round_post_budgets(True)
 
-        budgets = {
-            state.trader_id: state.budget
-            for state in result.rounds[1].pre_round_states
-        }
-        self.assertAlmostEqual(budgets["trader_a"], 1.0)
-        self.assertAlmostEqual(budgets["trader_b"], 1.0)
+        # Sanity check: the pressure cut actually fires in the control arm
+        # on the uncontested final round at this seed, so the comparison
+        # below is meaningful rather than vacuous.
+        self.assertLess(control_budgets["trader_a"], 1.0)
+
+        # Under capital authority the boss is the only thing that moves
+        # capital, so an even split must leave both on 1.0 for every round,
+        # including the final one -- unlike the control arm on the very same
+        # seed.
+        self.assertAlmostEqual(authority_budgets["trader_a"], 1.0)
+        self.assertAlmostEqual(authority_budgets["trader_b"], 1.0)
+        self.assertNotEqual(authority_budgets, control_budgets)
 
     def test_a_zeroed_trader_still_produces_a_full_round(self) -> None:
         from agents.boss import BossMandate, BossReview
@@ -402,6 +428,84 @@ class CapitalAuthorityEpisodeTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             run_episode(config)
+
+    def test_post_round_states_reflect_the_allocation(self) -> None:
+        from agents.boss import BossMandate, BossReview
+
+        class LopsidedBoss:
+            def mandate(self, context) -> BossMandate:
+                return BossMandate(content="Trade.")
+
+            def review(self, context) -> BossReview:
+                return BossReview(
+                    attributed_pnl={"trader_a": 1.0, "trader_b": -1.0},
+                    allocation={"trader_a": 3.0, "trader_b": 1.0},
+                    feedback={},
+                )
+
+        config = EpisodeConfig(
+            episode_id="self-consistent",
+            seed=5,
+            rounds=2,
+            boss_capital_authority=True,
+        )
+
+        result = run_episode(config, boss=LopsidedBoss())
+        first, second = result.rounds[0], result.rounds[1]
+
+        post_budgets = {
+            state.trader_id: state.budget for state in first.post_round_states
+        }
+        pre_budgets = {
+            state.trader_id: state.budget for state in second.pre_round_states
+        }
+        # The record for round 1 must say what round 2 actually inherited --
+        # otherwise a reader looking only at post_round_states would miss
+        # every boss move, unlike the control arm where the rank cut is
+        # already visible there.
+        self.assertEqual(post_budgets, pre_budgets)
+        self.assertAlmostEqual(post_budgets["trader_a"], 1.5)
+        self.assertAlmostEqual(post_budgets["trader_b"], 0.5)
+
+    def test_capital_authority_needs_a_review_before_the_episode_ends(
+        self,
+    ) -> None:
+        from agents.boss import BossMandate, BossReview
+
+        class EvenBoss:
+            def mandate(self, context) -> BossMandate:
+                return BossMandate(content="Trade.")
+
+            def review(self, context) -> BossReview:
+                return BossReview(
+                    attributed_pnl={"trader_a": 0.0, "trader_b": 0.0},
+                    allocation={"trader_a": 1.0, "trader_b": 1.0},
+                    feedback={},
+                )
+
+        # rounds=1: the review guard is `round_number < config.rounds`, so
+        # round 1 never qualifies and no allocation is ever made.
+        one_round = EpisodeConfig(
+            episode_id="one-round",
+            seed=5,
+            rounds=1,
+            boss_capital_authority=True,
+        )
+        # rounds=2, review_interval=2: round_number % review_interval == 0
+        # first happens at round 2, which also fails round_number < rounds.
+        # Same silent no-review outcome via a different combination.
+        interval_matches_rounds = EpisodeConfig(
+            episode_id="interval-matches-rounds",
+            seed=5,
+            rounds=2,
+            review_interval=2,
+            boss_capital_authority=True,
+        )
+
+        with self.assertRaises(ValueError):
+            run_episode(one_round, boss=EvenBoss())
+        with self.assertRaises(ValueError):
+            run_episode(interval_matches_rounds, boss=EvenBoss())
 
 
 if __name__ == "__main__":

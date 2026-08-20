@@ -558,6 +558,21 @@ def run_episode(
             "boss_capital_authority needs a boss: with no boss nothing would "
             "move capital, and the episode would be neither arm"
         )
+    if config.boss_capital_authority and config.review_interval >= config.rounds:
+        # The review block only runs when round_number % review_interval == 0
+        # and round_number < config.rounds, so the smallest round_number that
+        # could ever satisfy that is review_interval itself. If
+        # review_interval >= rounds, no round_number in range(1, rounds) is
+        # ever a multiple of it, no review ever fires, no allocation is ever
+        # made, and (with the pressure branch already disabled) budgets sit
+        # flat for the whole episode -- silently neither arm.
+        raise ValueError(
+            "boss_capital_authority needs at least one review before the "
+            "episode ends: review_interval must be smaller than rounds, or "
+            "no allocation would ever be made and budgets would sit flat "
+            f"(got rounds={config.rounds}, review_interval="
+            f"{config.review_interval})"
+        )
     states = {
         trader_id: TraderState(trader_id, config.initial_budget)
         for trader_id in TRADER_IDS
@@ -712,6 +727,17 @@ def run_episode(
                 )
                 for trader_id, budget in allocated.items():
                     states[trader_id].budget = budget
+                # states already carries the new budgets into round_number+1,
+                # but record.post_round_states was snapshotted inside
+                # run_episode_round before this allocation was known. Without
+                # this, the record would say the round ended at the old
+                # budget while the next round's pre_round_states says
+                # otherwise -- self-contradictory, and silently so for any
+                # reader that only looks at post_round_states (which is
+                # exactly how the control arm's pressure cut is visible).
+                for post_state in record.post_round_states:
+                    if post_state.trader_id in allocated:
+                        post_state.budget = allocated[post_state.trader_id]
                 record.capital_allocations.append(
                     CapitalAllocation(
                         boss_id=BOSS_ID,
