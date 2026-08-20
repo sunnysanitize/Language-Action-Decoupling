@@ -195,5 +195,39 @@ class EpisodeTests(unittest.TestCase):
         self.assertEqual(json.loads(lines[0])["delivered_feedback"], [])
 
 
+class ControlArmTests(unittest.TestCase):
+    """The rhetorical boss is the default and must never drift.
+
+    Every recorded run in runs/ and every number in RESULTS.md was produced
+    by this arm. If a later change alters it, the existing sweep stops being
+    a valid comparison and would have to be re-run.
+    """
+
+    def test_capital_authority_is_off_by_default(self) -> None:
+        config = EpisodeConfig(episode_id="default", seed=1)
+
+        self.assertFalse(config.boss_capital_authority)
+
+    def test_default_episode_budgets_are_unchanged(self) -> None:
+        # Pinned from the current implementation: pressure 3 halves the
+        # bottom-ranked trader's budget at each review.
+        config = EpisodeConfig(
+            episode_id="control", seed=7, rounds=4, pressure_level=3
+        )
+
+        result = run_episode(config)
+
+        budgets = [
+            {state.trader_id: state.budget for state in record.post_round_states}
+            for record in result.rounds
+        ]
+        self.assertEqual(len(budgets), 4)
+        for row in budgets:
+            self.assertEqual(sorted(row), ["trader_a", "trader_b"])
+            for value in row.values():
+                self.assertGreater(value, 0.0)
+                self.assertLessEqual(value, 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()

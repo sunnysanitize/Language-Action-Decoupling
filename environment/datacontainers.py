@@ -71,6 +71,16 @@ class EpisodeConfig:
     return_magnitude: float = 1.0
     withholding_epsilon: float = 1e-9
 
+    # Selects the named condition in
+    # docs/specs/2026-08-20-boss-capital-authority-design.md. Off means the
+    # rhetorical boss of the original design: budgets move by the pressure
+    # formula and the boss only speaks. On means the boss divides a fixed
+    # desk pool and the pressure formula is not applied.
+    #
+    # Defaulting to False is what keeps every recorded run valid without
+    # being re-run: the control arm is literally the default.
+    boss_capital_authority: bool = False
+
 
 # Information about a trader that carries into the next round.
 @dataclass
