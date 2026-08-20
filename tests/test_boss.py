@@ -1,6 +1,6 @@
 import json
 import unittest
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 from agents.boss import (
     DESK_ID,
@@ -299,6 +299,257 @@ class LLMBossTests(unittest.TestCase):
         )
 
         LLMBossPolicy(model_client=model).review(self.review_context())
+
+        prompt = json.dumps(model.calls[0][1])
+        self.assertNotIn("executed", prompt)
+        self.assertNotIn("realized_return", prompt)
+        self.assertNotIn("rank", prompt)
+
+
+class CapitalAuthorityTests(unittest.TestCase):
+    @staticmethod
+    def _context():
+        return ReviewContext(
+            directive=firm_directive(3),
+            round_number=1,
+            desk=desk_view(DESK_ID, [build_round()], [build_round()]),
+            traders=(
+                trader_card("trader_a", [build_round()]),
+                trader_card("trader_b", [build_round()]),
+            ),
+        )
+
+    def test_the_rhetorical_boss_returns_no_allocation(self) -> None:
+        review = ScriptedBossPolicy().review(self._context())
+
+        self.assertEqual(review.allocation, {})
+        self.assertEqual(review.attributed_pnl, {})
+
+    def test_the_capital_boss_returns_an_allocation(self) -> None:
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "trader_a carried the desk.",
+                    "attributed_pnl": {"trader_a": 1.0, "trader_b": -0.5},
+                    "allocation": {"trader_a": 1.5, "trader_b": 0.5},
+                    "feedback": {"trader_a": "Good.", "trader_b": "Improve."},
+                }
+            ]
+        )
+
+        review = LLMBossPolicy(model, capital_authority=True).review(
+            self._context()
+        )
+
+        self.assertEqual(review.allocation, {"trader_a": 1.5, "trader_b": 0.5})
+        self.assertEqual(
+            review.attributed_pnl, {"trader_a": 1.0, "trader_b": -0.5}
+        )
+        self.assertEqual(review.feedback["trader_a"], "Good.")
+
+    def test_the_capital_boss_uses_its_own_system_prompt(self) -> None:
+        from agents.prompts import BOSS_CAPITAL_SYSTEM_PROMPT, BOSS_SYSTEM_PROMPT
+
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Even split.",
+                    "attributed_pnl": {"trader_a": 0.0, "trader_b": 0.0},
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+        system_prompt = model.calls[0][0]
+        self.assertEqual(system_prompt, BOSS_CAPITAL_SYSTEM_PROMPT)
+        self.assertNotEqual(system_prompt, BOSS_SYSTEM_PROMPT)
+
+    def test_an_allocation_omitting_a_trader_is_rejected(self) -> None:
+        # Unlike feedback, where an absent trader legitimately means "told
+        # nothing this cycle", an absent allocation is indistinguishable from
+        # a formatting failure and would silently read as zero capital.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Only one matters.",
+                    "attributed_pnl": {"trader_a": 1.0, "trader_b": 0.0},
+                    "allocation": {"trader_a": 2.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+    def test_a_negative_allocation_is_rejected(self) -> None:
+        # allocation is a share of a fixed capital pool, so unlike
+        # attributed_pnl (where a loss is genuine negative data) a negative
+        # split is a contract violation, not a decision.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Punishing trader_b.",
+                    "attributed_pnl": {"trader_a": 1.0, "trader_b": -1.0},
+                    "allocation": {"trader_a": 2.0, "trader_b": -1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+    def test_reasoning_must_still_come_first(self) -> None:
+        model = FakeModel(
+            [
+                {
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "private_reasoning": "Written afterwards.",
+                    "attributed_pnl": {"trader_a": 0.0, "trader_b": 0.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+    def test_attribution_must_precede_allocation(self) -> None:
+        # Attribution sampled after the split would be a rationalisation of a
+        # decision already made, which is the same reason private_reasoning
+        # comes first.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Deciding.",
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "attributed_pnl": {"trader_a": 0.0, "trader_b": 0.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+    def test_an_attributed_pnl_naming_a_trader_outside_the_desk_is_rejected(
+        self,
+    ) -> None:
+        # A hallucinated id here would be recorded on the CapitalAllocation and
+        # read straight into analysis as if it named a real desk member.
+        # feedback and allocation already reject this; attributed_pnl must
+        # match.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Crediting a ghost.",
+                    "attributed_pnl": {"trader_a": 1.0, "trader_z": -1.0},
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        with self.assertRaises(ModelResponseError):
+            LLMBossPolicy(model, capital_authority=True).review(self._context())
+
+    def test_attributed_pnl_still_permits_negative_values_and_omission(
+        self,
+    ) -> None:
+        # A trader can genuinely have lost money, and a trader left out of the
+        # attribution is a decision the boss is allowed to make -- only an
+        # unknown id is a defect.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "trader_b lost money; trader_a untouched.",
+                    "attributed_pnl": {"trader_b": -0.75},
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+
+        review = LLMBossPolicy(model, capital_authority=True).review(
+            self._context()
+        )
+
+        self.assertEqual(review.attributed_pnl, {"trader_b": -0.75})
+
+    def test_the_capital_boss_prompt_carries_the_current_budgets(self) -> None:
+        # Each model call is stateless and normalize_allocation rescales
+        # whatever ratios the boss returns, so without this the boss could
+        # never learn the pool's magnitude or compare a claim against a
+        # ceiling. The budgets it previously allocated must reach the prompt.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "Even split.",
+                    "attributed_pnl": {"trader_a": 0.0, "trader_b": 0.0},
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+        context = replace(
+            self._context(),
+            current_budgets={"trader_a": 1.3, "trader_b": 0.7},
+        )
+
+        LLMBossPolicy(model, capital_authority=True).review(context)
+
+        prompt_context = model.calls[0][1]["context"]
+        self.assertEqual(
+            prompt_context["current_budgets"],
+            {"trader_a": 1.3, "trader_b": 0.7},
+        )
+
+    def test_the_rhetorical_boss_prompt_is_unchanged_by_current_budgets(
+        self,
+    ) -> None:
+        # current_budgets is populated by run_episode only under capital
+        # authority. Even if a caller passes it anyway, the rhetorical arm's
+        # prompt must not carry it -- budgets in that arm move by the
+        # pressure formula, not a boss decision.
+        model = FakeModel(
+            [{"private_reasoning": "ok", "feedback": {"trader_a": "fine"}}]
+        )
+        context = replace(
+            self._context(),
+            current_budgets={"trader_a": 1.3, "trader_b": 0.7},
+        )
+
+        LLMBossPolicy(model, capital_authority=False).review(context)
+
+        prompt_context = model.calls[0][1]["context"]
+        self.assertNotIn("current_budgets", prompt_context)
+
+    def test_the_capital_boss_prompt_never_carries_ground_truth(self) -> None:
+        # The leak-regression counterpart to
+        # LLMBossTests.test_the_boss_prompt_never_carries_ground_truth. After
+        # current_budgets was added the prompt legitimately contains numbers,
+        # so this asserts on the forbidden fields specifically rather than on
+        # the presence of any number.
+        model = FakeModel(
+            [
+                {
+                    "private_reasoning": "ok",
+                    "attributed_pnl": {"trader_a": 0.0, "trader_b": 0.0},
+                    "allocation": {"trader_a": 1.0, "trader_b": 1.0},
+                    "feedback": {},
+                }
+            ]
+        )
+        context = replace(
+            self._context(),
+            current_budgets={"trader_a": 1.3, "trader_b": 0.7},
+        )
+
+        LLMBossPolicy(model, capital_authority=True).review(context)
 
         prompt = json.dumps(model.calls[0][1])
         self.assertNotIn("executed", prompt)

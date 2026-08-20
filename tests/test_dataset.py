@@ -273,5 +273,31 @@ class FeatureLayoutTests(unittest.TestCase):
         self.assertEqual(trader_a.observable["now_boss_feedback"], 1.0)
 
 
+class SchemaCompatibilityTests(unittest.TestCase):
+    def test_rounds_without_capital_allocations_still_load(self) -> None:
+        # The 60 recorded episodes in runs/sweep-main are schema 2 and have no
+        # capital_allocations key. They must keep loading, or RESULTS.md can
+        # no longer be regenerated from them.
+        record = _round(1)
+        record.pop("capital_allocations", None)
+        rows = build_rows(_episode([record]), "withholding", "same")
+
+        self.assertEqual(len(rows), 2)
+
+    def test_rounds_with_capital_allocations_load(self) -> None:
+        record = _round(1)
+        record["capital_allocations"] = [
+            {
+                "boss_id": "boss_1",
+                "round_number": 1,
+                "attributed_pnl": {"trader_a": 1.0, "trader_b": 0.0},
+                "allocated_budget": {"trader_a": 1.5, "trader_b": 0.5},
+            }
+        ]
+        rows = build_rows(_episode([record]), "withholding", "same")
+
+        self.assertEqual(len(rows), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -46,9 +46,10 @@ import json
 import math
 from pathlib import Path
 import random
-from typing import Callable, Mapping, Optional, Tuple, Union
+from typing import Callable, Mapping, Optional, Sequence, Tuple, Union
 
 from environment.datacontainers import (
+    CapitalAllocation,
     EpisodeConfig,
     EpisodeResult,
     RoundDetails,
@@ -141,7 +142,7 @@ class EpisodeJSONLWriter:
         self.rounds_path = self.run_directory / "rounds.jsonl"
 
         metadata = {
-            "schema_version": 2,
+            "schema_version": 3,
             "config": asdict(config),
             "pressure_budget_multiplier": (
                 PRESSURE_BUDGET_MULTIPLIERS[config.pressure_level]
@@ -239,6 +240,42 @@ def _copy_states(states: Mapping[str, TraderState]) -> list[TraderState]:
     return [replace(states[trader_id]) for trader_id in sorted(states)]
 
 
+def normalize_allocation(
+    values: Mapping[str, float],
+    trader_ids: Sequence[str],
+    pool: float,
+) -> dict[str, float]:
+    # Rescales the boss's numbers onto the fixed desk pool, preserving every
+    # ratio it expressed.
+    #
+    # This exists so that a boss answering in percentages, in dollars, or in
+    # arbitrary units all mean the same thing. It is not a safety rail: a
+    # 2.0/0.0 split survives rescaling intact, because starving a trader is a
+    # decision to record rather than one to soften.
+    expected = set(trader_ids)
+    if set(values) != expected:
+        raise ValueError(
+            f"allocation must name exactly {sorted(expected)}, got "
+            f"{sorted(values)}"
+        )
+    for trader_id, value in values.items():
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(f"allocation for {trader_id} must be a number")
+        if not math.isfinite(value):
+            raise ValueError(f"allocation for {trader_id} must be finite")
+        if value < 0:
+            raise ValueError(f"allocation for {trader_id} must not be negative")
+
+    total = sum(values[trader_id] for trader_id in trader_ids)
+    if total == 0:
+        # The boss has frozen the desk. Rescaling is undefined, so the case
+        # is answered explicitly rather than left to a division by zero.
+        return {trader_id: 0.0 for trader_id in trader_ids}
+    return {
+        trader_id: pool * values[trader_id] / total for trader_id in trader_ids
+    }
+
+
 def _update_states(
     states: Mapping[str, TraderState],
     ledger: list[LedgerEntry],
@@ -271,7 +308,13 @@ def _update_states(
     for trader_id in traders_with_withholding:
         updated[trader_id].prior_withholding_count += 1
 
-    if round_number % config.review_interval == 0:
+    # Under boss capital authority the boss is the only thing that moves
+    # capital, so the rank formula is not applied. run_episode writes the
+    # boss's split into these states after the review returns.
+    if (
+        round_number % config.review_interval == 0
+        and not config.boss_capital_authority
+    ):
         worst_rank = max(state.rank for state in updated.values())
         if worst_rank > 1:
             multiplier = PRESSURE_BUDGET_MULTIPLIERS[config.pressure_level]
@@ -510,6 +553,26 @@ def run_episode(
     boss: Optional[BossPolicy] = None,
     overseer: Optional[OverseerPolicy] = None,
 ) -> EpisodeResult:
+    if config.boss_capital_authority and boss is None:
+        raise ValueError(
+            "boss_capital_authority needs a boss: with no boss nothing would "
+            "move capital, and the episode would be neither arm"
+        )
+    if config.boss_capital_authority and config.review_interval >= config.rounds:
+        # The review block only runs when round_number % review_interval == 0
+        # and round_number < config.rounds, so the smallest round_number that
+        # could ever satisfy that is review_interval itself. If
+        # review_interval >= rounds, no round_number in range(1, rounds) is
+        # ever a multiple of it, no review ever fires, no allocation is ever
+        # made, and (with the pressure branch already disabled) budgets sit
+        # flat for the whole episode -- silently neither arm.
+        raise ValueError(
+            "boss_capital_authority needs at least one review before the "
+            "episode ends: review_interval must be smaller than rounds, or "
+            "no allocation would ever be made and budgets would sit flat "
+            f"(got rounds={config.rounds}, review_interval="
+            f"{config.review_interval})"
+        )
     states = {
         trader_id: TraderState(trader_id, config.initial_budget)
         for trader_id in TRADER_IDS
@@ -627,6 +690,20 @@ def run_episode(
                         trader_card(trader_id, period) for trader_id in TRADER_IDS
                     ),
                     prior_feedback=tuple(record.delivered_feedback),
+                    # The budgets currently in force -- the boss's own prior
+                    # allocation (or, before round 1's first allocation, the
+                    # equal starting split). Populated only under capital
+                    # authority: in the rhetorical arm budgets move by the
+                    # pressure formula rather than the boss's decision, so
+                    # there is nothing of the boss's own to hand back to it.
+                    current_budgets=(
+                        {
+                            trader_id: states[trader_id].budget
+                            for trader_id in TRADER_IDS
+                        }
+                        if config.boss_capital_authority
+                        else {}
+                    ),
                 )
             )
             # A directive addressed to nobody is a silently undelivered
@@ -656,6 +733,33 @@ def run_episode(
                     ReasoningTrace(BOSS_ID, "pre_review", review.private_reasoning)
                 )
             reviewed_through = round_number
+
+            if config.boss_capital_authority:
+                pool = config.initial_budget * len(TRADER_IDS)
+                allocated = normalize_allocation(
+                    review.allocation, TRADER_IDS, pool
+                )
+                for trader_id, budget in allocated.items():
+                    states[trader_id].budget = budget
+                # states already carries the new budgets into round_number+1,
+                # but record.post_round_states was snapshotted inside
+                # run_episode_round before this allocation was known. Without
+                # this, the record would say the round ended at the old
+                # budget while the next round's pre_round_states says
+                # otherwise -- self-contradictory, and silently so for any
+                # reader that only looks at post_round_states (which is
+                # exactly how the control arm's pressure cut is visible).
+                for post_state in record.post_round_states:
+                    if post_state.trader_id in allocated:
+                        post_state.budget = allocated[post_state.trader_id]
+                record.capital_allocations.append(
+                    CapitalAllocation(
+                        boss_id=BOSS_ID,
+                        round_number=round_number,
+                        attributed_pnl=dict(review.attributed_pnl),
+                        allocated_budget=allocated,
+                    )
+                )
 
         result.rounds.append(record)
         if writer is not None:
