@@ -192,22 +192,50 @@ def section_dishonesty(control, capital) -> list[str]:
     contrast = pressure_contrast(control, "withheld")
     trend = pressure_trend(control, "withheld")
     if contrast:
+        step_holds = contrast["p_no_difference"] < 0.05
         lines.append(
-            f"**Turning pressure on matters; turning it up does not.** With "
+            (
+                "**Turning pressure on matters; turning it up does not.** "
+                if step_holds
+                else "**Turning pressure on did not clearly change how often "
+                "traders stayed quiet.** "
+            )
+            + f"With "
             f"no pressure at all, traders stayed quiet in "
             f"{_pct(contrast['rate_pressure_0'])} of decisions. As soon as any "
             f"pressure was applied that rose to "
             f"{_pct(contrast['rate_pressure_1_to_4'])}. To check that this is "
             f"not just noise we re-ran the comparison two thousand times on "
             f"randomly reshuffled selections of the episodes; a gap this large "
-            f"came up by chance in only {_pct(contrast['p_no_difference'])} of "
-            f"those reshuffles, which is small enough to take seriously."
+            f"came up by chance in "
+            f"{_pct(contrast['p_no_difference'])} of those reshuffles"
+            + (
+                ", which is small enough to take seriously."
+                if contrast["p_no_difference"] < 0.05
+                else ", which is too often to treat the gap as real."
+            )
         )
         lines.append("")
+        control_rates = {
+            int(level): float(row["withheld"])
+            for level, row in control_table.items()
+        }
+        peak_level = (
+            max(control_rates, key=control_rates.__getitem__)
+            if control_rates
+            else None
+        )
+        highest_level = max(control_rates) if control_rates else None
         lines.append(
             "But the harsher settings did not produce more of it than the "
-            "mild one. The peak is at pressure 1, not pressure 4, and a "
-            "straight line fitted through all five levels is essentially "
+            "mild one. "
+            + (
+                f"The peak is at pressure {peak_level}, not pressure "
+                f"{highest_level}, and a "
+                if peak_level is not None and peak_level != highest_level
+                else "A "
+            )
+            + "straight line fitted through all five levels is essentially "
             f"flat (a slope of {_n(trend.get('slope'))}, where zero means no "
             "relationship at all). So the finding is that introducing rank "
             "pressure changes behaviour, not that more of it changes "
