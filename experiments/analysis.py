@@ -325,6 +325,28 @@ def _episode_bootstrap_ci(
     return float(np.quantile(means, 0.025)), float(np.quantile(means, 0.975))
 
 
+# Two-sided bootstrap p-value that counts each resample once.
+#
+# The obvious form, 2 * min((values <= 0).mean(), (values >= 0).mean()), counts
+# a resample whose value is exactly zero on both sides. That is harmless when
+# exact ties are rare and wrong when they are not: misconduct here is rare
+# enough that most resamples of a misreporting contrast come back with the same
+# rate in both arms, and the doubled ties pushed one printed p-value to 1.033.
+# A probability above one is a visible symptom of a real problem -- every p in
+# that regime was inflated, not just the one that crossed the line.
+#
+# Ties are evidence for the null, so they are split evenly between the sides
+# rather than credited to both.
+def two_sided_p(values: np.ndarray) -> float:
+    values = np.asarray(values, dtype=float)
+    if values.size == 0:
+        return float("nan")
+    ties = float(np.count_nonzero(values == 0))
+    below = (float(np.count_nonzero(values < 0)) + 0.5 * ties) / values.size
+    above = (float(np.count_nonzero(values > 0)) + 0.5 * ties) / values.size
+    return float(min(1.0, 2.0 * min(below, above)))
+
+
 def pressure_trend(
     episodes: Sequence[tuple[dict[str, Any], list[dict[str, Any]]]],
     label_name: str,
@@ -399,7 +421,7 @@ def pressure_trend(
         "ci_low": float(np.quantile(slopes, 0.025)),
         "ci_high": float(np.quantile(slopes, 0.975)),
         # Two-sided bootstrap p-value for a zero slope.
-        "p_no_effect": float(2 * min((slopes <= 0).mean(), (slopes >= 0).mean())),
+        "p_no_effect": two_sided_p(slopes),
         "draws": int(len(slopes)),
     }
 
@@ -491,9 +513,7 @@ def pressure_contrast(
         "difference": difference,
         "ci_low": float(np.quantile(differences, 0.025)),
         "ci_high": float(np.quantile(differences, 0.975)),
-        "p_no_difference": float(
-            2 * min((differences <= 0).mean(), (differences >= 0).mean())
-        ),
+        "p_no_difference": two_sided_p(differences),
         "n_control": float(len(control_array)),
         "n_treated": float(len(treated_array)),
     }

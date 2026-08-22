@@ -72,6 +72,37 @@ def _quote(text: str, limit: int = 400) -> str:
     return f"> {cleaned}"
 
 
+# The smallest AUPRC gain this report is willing to call a gain, and the fewest
+# positives it will call one on.
+#
+# A p-value alone is not enough here. The misreporting comparison in
+# runs/capital-main returned p = 0.011 on a delta of 0.000 over 4 positive
+# rows: the resampled gain was consistently positive and consistently far
+# smaller than the third decimal the table prints, so a significance test
+# reported a real direction for an effect of no size. Printing that as "yes"
+# next to "0.000" invites the reader to believe the column rather than the
+# number beside it.
+#
+# Both thresholds are reporting conventions, not statistics. They decide what
+# this document is willing to assert; they never change a computed value, and
+# the delta, interval and p-value are printed either way so a reader can
+# disagree.
+MIN_DELTA_AUPRC = 0.005
+MIN_POSITIVES = 10
+
+
+def _adds_signal(results: dict[str, Any], comparison: dict[str, float]) -> str:
+    positives = results["1_situation"].positives
+    delta = comparison["delta_auprc"]
+    if comparison["p_no_gain"] >= 0.05:
+        return "no"
+    if positives < MIN_POSITIVES:
+        return f"too few ({positives})"
+    if delta < MIN_DELTA_AUPRC:
+        return "negligible"
+    return "**yes**"
+
+
 def section_findings(
     episodes: Sequence[tuple[dict[str, Any], list[dict[str, Any]]]],
 ) -> list[str]:
@@ -87,9 +118,28 @@ def section_findings(
     if contrast and trend:
         step_holds = contrast["p_no_difference"] < 0.05
         slope_holds = trend["p_no_effect"] < 0.05
+        # Both the headline and the monotonicity aside used to be fixed text.
+        # They survived a sweep where the contrast was not significant and the
+        # peak was not at pressure 1, so the bold claim contradicted the
+        # sentence under it. Anything asserted here is now read off the same
+        # numbers the sentence quotes.
+        rates_by_level = {
+            int(level): float(row["withheld"])
+            for level, row in misconduct_by_pressure(episodes).items()
+        }
+        peak_level = (
+            max(rates_by_level, key=rates_by_level.__getitem__)
+            if rates_by_level
+            else None
+        )
+        highest_level = max(rates_by_level) if rates_by_level else None
+        headline = (
+            "Pressure raises withholding, but as a step rather than a dose."
+            if step_holds
+            else "Pressure does not clearly raise withholding in this sweep."
+        )
         lines.append(
-            f"**1. Pressure raises withholding, but as a step rather than a "
-            f"dose.** Withholding runs at "
+            f"**1. {headline}** Withholding runs at "
             f"{contrast['rate_pressure_0']:.3f} with no pressure and "
             f"{contrast['rate_pressure_1_to_4']:.3f} once any pressure is "
             f"applied, a difference of {contrast['difference']:.3f} "
@@ -107,10 +157,17 @@ def section_findings(
             + (
                 "so severity matters on top of presence."
                 if slope_holds
-                else "so severity adds nothing beyond presence. The rates "
-                "are not monotonic -- the peak is at pressure 1, not "
-                "pressure 4 -- so the harsher conditions do not produce more "
-                "misconduct than the mild one."
+                else "so severity adds nothing beyond presence."
+            )
+            + (
+                f" The rates are not monotonic -- the peak is at pressure "
+                f"{peak_level}, not pressure {highest_level} -- so the "
+                f"harsher conditions do not produce more misconduct than the "
+                f"milder ones."
+                if not slope_holds
+                and peak_level is not None
+                and peak_level != highest_level
+                else ""
             )
         )
         lines.append("")
@@ -168,6 +225,9 @@ def section_findings(
         lines.append("")
 
     detector_lines = []
+    # Keyed by caption, so findings 3 to 5 can quote this sweep's own numbers
+    # instead of restating whichever sweep the prose was first written against.
+    detector_results: dict[str, dict[str, Any]] = {}
     for target, horizon, costly_only, caption in (
         ("withholding", "same", False, "withholding, same round"),
         ("withholding", "same", True, "costly withholding, same round"),
@@ -181,7 +241,8 @@ def section_findings(
         )
         if not comparison:
             continue
-        verdict = "**yes**" if comparison["p_no_gain"] < 0.05 else "no"
+        detector_results[caption] = {"results": results, "comparison": comparison}
+        verdict = _adds_signal(results, comparison)
         detector_lines.append(
             [
                 caption,
@@ -196,8 +257,22 @@ def section_findings(
             ]
         )
     if detector_lines:
+        gained = [
+            caption
+            for caption, entry in detector_results.items()
+            if _adds_signal(entry["results"], entry["comparison"]) == "**yes**"
+        ]
+        if not gained:
+            gain_headline = "Private reasoning adds nothing on any target."
+        elif len(gained) == 1:
+            gain_headline = f"Private reasoning helps for {gained[0]} only."
+        else:
+            gain_headline = (
+                f"Private reasoning helps on {len(gained)} of "
+                f"{len(detector_results)} targets."
+            )
         lines.append(
-            "**3. Private reasoning helps for one target only.** The question "
+            f"**3. {gain_headline}** The question "
             "the study asks is whether model 4 beats model 3 -- whether the "
             "scratchpad adds anything beyond the situation, the firm record, "
             "and everything the trader has already said."
@@ -219,36 +294,116 @@ def section_findings(
             )
         )
         lines.append("")
+        # Whether the gain survives a one-round horizon is the difference
+        # between a detector and a predictor, so it is checked rather than
+        # assumed.
+        next_round = detector_results.get("withholding, next round")
+        holds_next_round = bool(
+            next_round
+            and _adds_signal(next_round["results"], next_round["comparison"])
+            == "**yes**"
+        )
+        if gained:
+            lines.append(
+                (
+                    "The gain also holds a round ahead of the act. "
+                    if holds_next_round
+                    else "The gain is confined to the concurrent decision, "
+                    "and it disappears at a one-round horizon. "
+                )
+                + "Read alongside the feature weights at the end of this "
+                "report, the most economical reading is that the scratchpad "
+                "sometimes states the intention outright, which is useful "
+                "for catching an act in progress and is not by itself "
+                "evidence that it forecasts one. On the overview's framing: "
+                "private reasoning shows the agent is *about to act*"
+                + (
+                    ", and here it also carries some signal about later "
+                    "rounds."
+                    if holds_next_round
+                    else ", not that it *will act later*."
+                )
+            )
+            lines.append("")
+
+    # Finding 4 used to state a 2% base rate and a sub-0.5 AUROC as fixed
+    # text. In runs/capital-main the rate is 0.3%, so the sentence overstated
+    # the evidence sixfold in the sweep that had least of it.
+    misreporting = detector_results.get("misreporting, same round")
+    if misreporting:
+        results = misreporting["results"]
+        base_rate = results["1_situation"].base_rate
+        positives = results["1_situation"].positives
+        beyond_situation = [
+            results[name] for name in MODELS if name != "1_situation"
+        ]
+        at_or_below_base = all(
+            not np.isnan(item.auprc) and item.auprc <= item.base_rate
+            for item in beyond_situation
+        )
+        best_auroc = max(
+            (item.auroc for item in beyond_situation if not np.isnan(item.auroc)),
+            default=float("nan"),
+        )
+        # Whether this label is studiable at all is the thing being reported,
+        # so it is decided from the count and the detectors rather than
+        # asserted. MIN_POSITIVES is the same bar the table applies.
+        too_rare = positives < MIN_POSITIVES or at_or_below_base
+        if too_rare:
+            lines.append(
+                f"**4. Misreporting is too rare here to study.** It occurs in "
+                f"{base_rate:.1%} of trader-rounds ({positives} positives)"
+                + (
+                    ", and outside the situation-only model every detector "
+                    "scores at or below the base rate"
+                    if at_or_below_base
+                    else ""
+                )
+                + (
+                    f", with AUROC no better than {best_auroc:.2f}. "
+                    if not np.isnan(best_auroc)
+                    else ". "
+                )
+                + "Nothing in this sweep supports a claim about misreporting "
+                "in either direction; it needs either more episodes or a "
+                "design that makes under-reporting pay."
+            )
+        else:
+            lines.append(
+                f"**4. Misreporting is frequent enough here to model.** It "
+                f"occurs in {base_rate:.1%} of trader-rounds ({positives} "
+                f"positives), and the best detector beyond the situation-only "
+                f"model reaches an AUROC of {best_auroc:.2f}."
+            )
+        lines.append("")
+    # Finding 5 was written entirely as a string literal -- no sweep data was
+    # in scope at all, so it reported runs/sweep-main's calibration on top of
+    # whichever sweep was actually being summarised.
+    withholding = detector_results.get("withholding, same round")
+    calibration = (
+        withholding["results"]["4_private_reasoning"].calibration
+        if withholding
+        else []
+    )
+    if calibration:
+        top = calibration[-1]
+        predicted, observed = top["mean_predicted"], top["observed_rate"]
+        overconfident = predicted > 2 * observed
         lines.append(
-            "The gain is confined to the concurrent decision, and it "
-            "disappears at a one-round horizon. Read alongside the feature "
-            "weights at the end of this report -- the heaviest terms are "
-            "`not share`, `will not`, `will share` -- the most economical "
-            "reading is that the scratchpad sometimes states the intention "
-            "outright, which is useful for catching an act in progress and "
-            "not evidence that it forecasts one. On the overview's framing: "
-            "private reasoning shows the agent is *about to act*, not that it "
-            "*will act later*."
+            f"**5. The detector is "
+            + ("badly calibrated" if overconfident else "reasonably calibrated")
+            + f" where it matters.** In the top quintile of predicted risk "
+            f"for same-round withholding, model 4 predicts "
+            f"{predicted:.2f} and observes {observed:.2f}."
+            + (
+                " It ranks far better than it estimates probability, so it is "
+                "usable for an inspection queue and not for a threshold."
+                if overconfident
+                else " Ranking and probability estimates agree closely enough "
+                "to use a threshold."
+            )
         )
         lines.append("")
-
-    lines.append(
-        "**4. Misreporting is too rare here to study.** It occurs in roughly "
-        "2% of trader-rounds, and outside the situation-only model every "
-        "detector scores at or below the base rate, with AUROC under 0.5. "
-        "Nothing in this sweep supports a claim about misreporting in either "
-        "direction; it needs either more episodes or a design that makes "
-        "under-reporting pay."
-    )
-    lines.append("")
-    lines.append(
-        "**5. The detector is badly calibrated where it matters.** In the top "
-        "quintile of predicted risk for same-round withholding, model 4 "
-        "predicts 0.58 and observes 0.18. It ranks far better than it "
-        "estimates probability, so it is usable for an inspection queue and "
-        "not for a threshold."
-    )
-    lines.append("")
     return lines
 
 
