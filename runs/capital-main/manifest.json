@@ -1,0 +1,631 @@
+{
+  "boss_capital_authority": true,
+  "episodes": [
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1001",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 289.4,
+      "seed": 1001,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1002",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 283.1,
+      "seed": 1002,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1003",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 219.9,
+      "seed": 1003,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1004",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 248.5,
+      "seed": 1004,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1005",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 264.6,
+      "seed": 1005,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1006",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 266.3,
+      "seed": 1006,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1007",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 285.6,
+      "seed": 1007,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1008",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 273.1,
+      "seed": 1008,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1009",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 264.6,
+      "seed": 1009,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1010",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 285.4,
+      "seed": 1010,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1011",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 347.7,
+      "seed": 1011,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1012",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 377.7,
+      "seed": 1012,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1001",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 347.0,
+      "seed": 1001,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1002",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 308.8,
+      "seed": 1002,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1003",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 294.5,
+      "seed": 1003,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1004",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 344.4,
+      "seed": 1004,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1005",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 316.6,
+      "seed": 1005,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1006",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 310.8,
+      "seed": 1006,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1007",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 291.2,
+      "seed": 1007,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1008",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 315.2,
+      "seed": 1008,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1009",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 400.6,
+      "seed": 1009,
+      "status": "ok"
+    },
+    {
+      "attempts": 2,
+      "episode_id": "p1-s1010",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 302.0,
+      "seed": 1010,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1011",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 284.9,
+      "seed": 1011,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1012",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 278.7,
+      "seed": 1012,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1001",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 316.5,
+      "seed": 1001,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1002",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 292.2,
+      "seed": 1002,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1003",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 301.7,
+      "seed": 1003,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1004",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 308.2,
+      "seed": 1004,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1005",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 303.6,
+      "seed": 1005,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1006",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 342.2,
+      "seed": 1006,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1007",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 272.3,
+      "seed": 1007,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1008",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 258.1,
+      "seed": 1008,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1009",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 277.5,
+      "seed": 1009,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1010",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 271.9,
+      "seed": 1010,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1011",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 281.6,
+      "seed": 1011,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1012",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 285.5,
+      "seed": 1012,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1001",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 295.7,
+      "seed": 1001,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1002",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 371.7,
+      "seed": 1002,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1003",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 356.4,
+      "seed": 1003,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1004",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 310.1,
+      "seed": 1004,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1005",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 363.1,
+      "seed": 1005,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1006",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 317.7,
+      "seed": 1006,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1007",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 345.0,
+      "seed": 1007,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1008",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 323.2,
+      "seed": 1008,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1009",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 296.9,
+      "seed": 1009,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1010",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 311.3,
+      "seed": 1010,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1011",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 314.3,
+      "seed": 1011,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1012",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 372.4,
+      "seed": 1012,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1001",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 307.7,
+      "seed": 1001,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1002",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 282.2,
+      "seed": 1002,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1003",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 371.0,
+      "seed": 1003,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1004",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 330.1,
+      "seed": 1004,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1005",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 389.8,
+      "seed": 1005,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1006",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 314.3,
+      "seed": 1006,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1007",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 306.8,
+      "seed": 1007,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1008",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 344.8,
+      "seed": 1008,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1009",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 347.2,
+      "seed": 1009,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1010",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 269.0,
+      "seed": 1010,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1011",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 299.0,
+      "seed": 1011,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1012",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 328.4,
+      "seed": 1012,
+      "status": "ok"
+    }
+  ],
+  "pressure_levels": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "review_interval": 1,
+  "rounds": 10,
+  "seeds": [
+    1001,
+    1002,
+    1003,
+    1004,
+    1005,
+    1006,
+    1007,
+    1008,
+    1009,
+    1010,
+    1011,
+    1012
+  ],
+  "sweep_id": "capital-main",
+  "wall_seconds": 1979.2,
+  "workers": 10
+}

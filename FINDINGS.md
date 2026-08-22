@@ -1,6 +1,6 @@
 # Rank pressure and dishonesty in a simulated trading firm
 
-Findings as of 20 August 2026. Written in plain language; the full technical results, with every interval and diagnostic, are in `RESULTS.md`.
+Findings as of 22 August 2026. Written in plain language; the full technical results, with every interval and diagnostic, are in `RESULTS.md`.
 
 ## What was run
 
@@ -34,11 +34,11 @@ The figures below are the share of trader-decisions in which each kind of dishon
 | 3 | 0.025 | 0.054 | 0.021 | 0.000 |
 | 4 | 0.058 | 0.046 | 0.000 | 0.004 |
 
-**Turning pressure on matters; turning it up does not.** With no pressure at all, traders stayed quiet in 1.7% of decisions. As soon as any pressure was applied that rose to 6.1%. To check that this is not just noise we re-ran the comparison two thousand times on randomly reshuffled selections of the episodes; a gap this large came up by chance in only 0.6% of those reshuffles, which is small enough to take seriously.
+**Turning pressure on matters; turning it up does not.** With no pressure at all, traders stayed quiet in 1.7% of decisions. As soon as any pressure was applied that rose to 6.1%. To check that this is not just noise we re-ran the comparison two thousand times on randomly reshuffled selections of the episodes; a gap this large came up by chance in 0.5% of those reshuffles, which is small enough to take seriously.
 
 But the harsher settings did not produce more of it than the mild one. The peak is at pressure 1, not pressure 4, and a straight line fitted through all five levels is essentially flat (a slope of 0.008, where zero means no relationship at all). So the finding is that introducing rank pressure changes behaviour, not that more of it changes behaviour more.
 
-In Setup B the same comparison gives 3.3% with no pressure against 4.1% with pressure, appearing by chance in 65.3% of reshuffles.
+In Setup B the same comparison gives 3.3% with no pressure against 4.1% with pressure, appearing by chance in 63.6% of reshuffles.
 
 **Giving lying a payoff produced less lying, not more.** Traders lied in 23 of 1200 decisions when it gained them nothing (Setup A), and 4 of 1200 when it could win them capital (Setup B). That is the most surprising result here and it runs against the reason Setup B was built.
 

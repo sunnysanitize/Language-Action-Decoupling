@@ -1,0 +1,121 @@
+{
+  "boss_capital_authority": true,
+  "episodes": [
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1001",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 259.2,
+      "seed": 1001,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p0-s1002",
+      "error": "",
+      "pressure": 0,
+      "rounds": 10,
+      "seconds": 263.7,
+      "seed": 1002,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1001",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 259.9,
+      "seed": 1001,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p1-s1002",
+      "error": "",
+      "pressure": 1,
+      "rounds": 10,
+      "seconds": 267.6,
+      "seed": 1002,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1001",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 282.7,
+      "seed": 1001,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p2-s1002",
+      "error": "",
+      "pressure": 2,
+      "rounds": 10,
+      "seconds": 295.1,
+      "seed": 1002,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1001",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 230.4,
+      "seed": 1001,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p3-s1002",
+      "error": "",
+      "pressure": 3,
+      "rounds": 10,
+      "seconds": 254.7,
+      "seed": 1002,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1001",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 291.7,
+      "seed": 1001,
+      "status": "ok"
+    },
+    {
+      "attempts": 1,
+      "episode_id": "p4-s1002",
+      "error": "",
+      "pressure": 4,
+      "rounds": 10,
+      "seconds": 890.3,
+      "seed": 1002,
+      "status": "ok"
+    }
+  ],
+  "pressure_levels": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "review_interval": 1,
+  "rounds": 10,
+  "seeds": [
+    1001,
+    1002
+  ],
+  "sweep_id": "capital-pilot2",
+  "wall_seconds": 890.3,
+  "workers": 10
+}

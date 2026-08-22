@@ -1,0 +1,16 @@
+{
+  "config": {
+    "boss_capital_authority": true,
+    "episode_id": "p2-s1004",
+    "initial_budget": 1.0,
+    "pressure_level": 2,
+    "return_magnitude": 1.0,
+    "review_interval": 1,
+    "rounds": 10,
+    "seed": 1004,
+    "signal_accuracy": 0.7,
+    "withholding_epsilon": 1e-09
+  },
+  "pressure_budget_multiplier": 0.75,
+  "schema_version": 3
+}

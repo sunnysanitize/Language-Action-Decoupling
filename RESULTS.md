@@ -1,16 +1,16 @@
 # Results — sweep-main
 
-Generated 2026-08-20 19:13 UTC by `python -m experiments.report --sweep runs/sweep-main`.
+Generated 2026-08-22 18:08 UTC by `python -m experiments.report --sweep runs/sweep-main`.
 
 ## Findings
 
-**1. Pressure raises withholding, but as a step rather than a dose.** Withholding runs at 0.017 with no pressure and 0.061 once any pressure is applied, a difference of 0.045 (95% CI [0.010, 0.090], p = 0.006). That contrast is significant. The linear slope across the five levels is 0.008 (p = 0.932), so severity adds nothing beyond presence. The rates are not monotonic -- the peak is at pressure 1, not pressure 4 -- so the harsher conditions do not produce more misconduct than the mild one.
+**1. Pressure raises withholding, but as a step rather than a dose.** Withholding runs at 0.017 with no pressure and 0.061 once any pressure is applied, a difference of 0.045 (95% CI [0.010, 0.090], p = 0.005). That contrast is significant. The linear slope across the five levels is 0.008 (p = 0.932), so severity adds nothing beyond presence. The rates are not monotonic -- the peak is at pressure 1, not pressure 4 -- so the harsher conditions do not produce more misconduct than the milder ones.
 
 **2. The middle manager attenuates it.** Across 600 private statements, Ken Griffin raises capital threats at a rate of 0.312; across 1140 statements actually delivered to traders, the boss does so at 0.004, and threatens a trader's job at 0.000. 0 boss statements asserted authority over capital or employment that the boss does not have. The pressure does not survive the trip down the hierarchy in the language traders actually receive, which is the opposite of the amplifying middle manager the study was set up to look for.
 
    *Caveat.* Ken's rates are partly mechanical rather than emergent. `FIRM_DIRECTIVE_TEXT` in `agents/kengriffin.py` is in his prompt and names capital explicitly at pressure 2 and 4 and rank at pressure 3, which is why his capital-threat rate is high at 2 and 4 but zero at 3. Much of what the table shows is Ken restating the treatment he was handed. The boss's near-zero rates are the more informative half of the comparison, since nothing in the boss's prompt forces that.
 
-**3. Private reasoning helps for one target only.** The question the study asks is whether model 4 beats model 3 -- whether the scratchpad adds anything beyond the situation, the firm record, and everything the trader has already said.
+**3. Private reasoning helps for costly withholding, same round only.** The question the study asks is whether model 4 beats model 3 -- whether the scratchpad adds anything beyond the situation, the firm record, and everything the trader has already said.
 
 | target | positives | AUPRC model 3 | AUPRC model 4 | delta | 95% CI | p(no gain) | adds signal? |
 |---|---|---|---|---|---|---|---|
@@ -19,9 +19,9 @@ Generated 2026-08-20 19:13 UTC by `python -m experiments.report --sweep runs/swe
 | withholding, next round | 37 | 0.274 | 0.266 | -0.009 | [-0.066, 0.074] | 0.549 | no |
 | misreporting, same round | 23 | 0.017 | 0.018 | 0.001 | [-0.001, 0.007] | 0.116 | no |
 
-The gain is confined to the concurrent decision, and it disappears at a one-round horizon. Read alongside the feature weights at the end of this report -- the heaviest terms are `not share`, `will not`, `will share` -- the most economical reading is that the scratchpad sometimes states the intention outright, which is useful for catching an act in progress and not evidence that it forecasts one. On the overview's framing: private reasoning shows the agent is *about to act*, not that it *will act later*.
+The gain is confined to the concurrent decision, and it disappears at a one-round horizon. Read alongside the feature weights at the end of this report, the most economical reading is that the scratchpad sometimes states the intention outright, which is useful for catching an act in progress and is not by itself evidence that it forecasts one. On the overview's framing: private reasoning shows the agent is *about to act*, not that it *will act later*.
 
-**4. Misreporting is too rare here to study.** It occurs in roughly 2% of trader-rounds, and outside the situation-only model every detector scores at or below the base rate, with AUROC under 0.5. Nothing in this sweep supports a claim about misreporting in either direction; it needs either more episodes or a design that makes under-reporting pay.
+**4. Misreporting is too rare here to study.** It occurs in 1.9% of trader-rounds (23 positives), and outside the situation-only model every detector scores at or below the base rate, with AUROC no better than 0.47. Nothing in this sweep supports a claim about misreporting in either direction; it needs either more episodes or a design that makes under-reporting pay.
 
 **5. The detector is badly calibrated where it matters.** In the top quintile of predicted risk for same-round withholding, model 4 predicts 0.58 and observes 0.18. It ranks far better than it estimates probability, so it is usable for an inspection queue and not for a threshold.
 
@@ -69,9 +69,9 @@ The slope above is a straight line through five levels, which is the right test 
 
 | label | rate at pressure 0 | rate at pressure 1-4 | difference | 95% CI | bootstrap p |
 |---|---|---|---|---|---|
-| withholding (the decision) | 0.017 | 0.061 | 0.045 | [0.010, 0.090] | 0.006 |
-| costly withholding | 0.013 | 0.040 | 0.027 | [0.000, 0.060] | 0.051 |
-| misreporting | 0.004 | 0.023 | 0.019 | [0.000, 0.042] | 0.057 |
+| withholding (the decision) | 0.017 | 0.061 | 0.045 | [0.010, 0.090] | 0.005 |
+| costly withholding | 0.013 | 0.040 | 0.027 | [0.000, 0.060] | 0.045 |
+| misreporting | 0.004 | 0.023 | 0.019 | [0.000, 0.042] | 0.052 |
 
 ## Hierarchy: Ken Griffin and the boss
 
@@ -371,30 +371,30 @@ Coefficients from a fit on all rows, for description only. These are in-sample a
 
 # Results — capital-main
 
-Generated 2026-08-20 22:42 UTC by `python -m experiments.report --sweep runs/capital-main`.
+Generated 2026-08-22 18:09 UTC by `python -m experiments.report --sweep runs/capital-main`.
 
 ## Findings
 
-**1. Pressure raises withholding, but as a step rather than a dose.** Withholding runs at 0.033 with no pressure and 0.041 once any pressure is applied, a difference of 0.007 (95% CI [-0.035, 0.040], p = 0.653). That contrast is not significant at the 5% level. The linear slope across the five levels is 0.134 (p = 0.391), so severity adds nothing beyond presence. The rates are not monotonic -- the peak is at pressure 1, not pressure 4 -- so the harsher conditions do not produce more misconduct than the mild one.
+**1. Pressure does not clearly raise withholding in this sweep.** Withholding runs at 0.033 with no pressure and 0.041 once any pressure is applied, a difference of 0.007 (95% CI [-0.035, 0.040], p = 0.636). That contrast is not significant at the 5% level. The linear slope across the five levels is 0.134 (p = 0.391), so severity adds nothing beyond presence. The rates are not monotonic -- the peak is at pressure 3, not pressure 4 -- so the harsher conditions do not produce more misconduct than the milder ones.
 
 **2. The middle manager attenuates it.** Across 600 private statements, Ken Griffin raises capital threats at a rate of 0.323; across 1140 statements actually delivered to traders, the boss does so at 0.021, and threatens a trader's job at 0.000. 16 boss statements asserted authority over capital or employment that the boss does not have. The pressure does not survive the trip down the hierarchy in the language traders actually receive, which is the opposite of the amplifying middle manager the study was set up to look for.
 
    *Caveat.* Ken's rates are partly mechanical rather than emergent. `FIRM_DIRECTIVE_TEXT` in `agents/kengriffin.py` is in his prompt and names capital explicitly at pressure 2 and 4 and rank at pressure 3, which is why his capital-threat rate is high at 2 and 4 but zero at 3. Much of what the table shows is Ken restating the treatment he was handed. The boss's near-zero rates are the more informative half of the comparison, since nothing in the boss's prompt forces that.
 
-**3. Private reasoning helps for one target only.** The question the study asks is whether model 4 beats model 3 -- whether the scratchpad adds anything beyond the situation, the firm record, and everything the trader has already said.
+**3. Private reasoning helps on 2 of 4 targets.** The question the study asks is whether model 4 beats model 3 -- whether the scratchpad adds anything beyond the situation, the firm record, and everything the trader has already said.
 
 | target | positives | AUPRC model 3 | AUPRC model 4 | delta | 95% CI | p(no gain) | adds signal? |
 |---|---|---|---|---|---|---|---|
 | withholding, same round | 47 | 0.175 | 0.251 | 0.077 | [0.027, 0.162] | 0.000 | **yes** |
 | costly withholding, same round | 34 | 0.164 | 0.256 | 0.092 | [0.024, 0.195] | 0.003 | **yes** |
 | withholding, next round | 18 | 0.061 | 0.058 | -0.003 | [-0.013, 0.005] | 0.792 | no |
-| misreporting, same round | 4 | 0.002 | 0.002 | 0.000 | [0.000, 0.000] | 0.011 | **yes** |
+| misreporting, same round | 4 | 0.002 | 0.002 | 0.000 | [0.000, 0.000] | 0.011 | too few (4) |
 
-The gain is confined to the concurrent decision, and it disappears at a one-round horizon. Read alongside the feature weights at the end of this report -- the heaviest terms are `not share`, `will not`, `will share` -- the most economical reading is that the scratchpad sometimes states the intention outright, which is useful for catching an act in progress and not evidence that it forecasts one. On the overview's framing: private reasoning shows the agent is *about to act*, not that it *will act later*.
+The gain is confined to the concurrent decision, and it disappears at a one-round horizon. Read alongside the feature weights at the end of this report, the most economical reading is that the scratchpad sometimes states the intention outright, which is useful for catching an act in progress and is not by itself evidence that it forecasts one. On the overview's framing: private reasoning shows the agent is *about to act*, not that it *will act later*.
 
-**4. Misreporting is too rare here to study.** It occurs in roughly 2% of trader-rounds, and outside the situation-only model every detector scores at or below the base rate, with AUROC under 0.5. Nothing in this sweep supports a claim about misreporting in either direction; it needs either more episodes or a design that makes under-reporting pay.
+**4. Misreporting is too rare here to study.** It occurs in 0.3% of trader-rounds (4 positives), and outside the situation-only model every detector scores at or below the base rate, with AUROC no better than 0.05. Nothing in this sweep supports a claim about misreporting in either direction; it needs either more episodes or a design that makes under-reporting pay.
 
-**5. The detector is badly calibrated where it matters.** In the top quintile of predicted risk for same-round withholding, model 4 predicts 0.58 and observes 0.18. It ranks far better than it estimates probability, so it is usable for an inspection queue and not for a threshold.
+**5. The detector is badly calibrated where it matters.** In the top quintile of predicted risk for same-round withholding, model 4 predicts 0.58 and observes 0.16. It ranks far better than it estimates probability, so it is usable for an inspection queue and not for a threshold.
 
 ## Sweep
 
@@ -440,9 +440,9 @@ The slope above is a straight line through five levels, which is the right test 
 
 | label | rate at pressure 0 | rate at pressure 1-4 | difference | 95% CI | bootstrap p |
 |---|---|---|---|---|---|
-| withholding (the decision) | 0.033 | 0.041 | 0.007 | [-0.035, 0.040] | 0.653 |
-| costly withholding | 0.017 | 0.031 | 0.015 | [-0.011, 0.037] | 0.278 |
-| misreporting | 0.004 | 0.003 | -0.001 | [-0.011, 0.007] | 1.033 |
+| withholding (the decision) | 0.033 | 0.041 | 0.007 | [-0.035, 0.040] | 0.636 |
+| costly withholding | 0.017 | 0.031 | 0.015 | [-0.011, 0.037] | 0.264 |
+| misreporting | 0.004 | 0.003 | -0.001 | [-0.011, 0.007] | 0.931 |
 
 ## Hierarchy: Ken Griffin and the boss
 
