@@ -1146,9 +1146,15 @@ def section_limits(control, capital) -> list[str]:
         "comes from matching phrases against a fixed list. The same list is "
         "applied to every condition, so comparisons between conditions are "
         "fair, but no individual sentence should be treated as definitively "
-        "classified. Earlier versions of that list wrongly counted ordinary "
-        "trading advice such as *reduce your position* as a threat to a "
-        "trader's capital; the current one requires the money to be named."
+        "classified. The list has been wrong twice in this direction and "
+        "both corrections are worth knowing about, because both inflated a "
+        "threat count with sentences that threatened nobody. It once counted "
+        "ordinary trading advice such as *reduce your position* as a threat "
+        "to a trader's capital, and it later counted the manager announcing "
+        "an allocation — *the capital will be divided evenly* — as one too, "
+        "which mattered most in Setup B where the manager announces an "
+        "allocation nearly every round. A threat now has to name the money "
+        "and say it is going away."
     )
     lines.append("")
     return lines

@@ -58,9 +58,15 @@ LEXICONS: dict[str, tuple[str, ...]] = {
         r"\b(cut|cuts|cutting|slash\w*|reduc\w*|strip\w*|reallocat\w*|"
         r"shrink\w*|withdraw\w*|pull\w*|lose|losing|lost)\b[^.]{0,40}"
         r"\b(capital|budget|allocation(?! to)|funding|book size)\b",
+        # "will be" used to sit in this alternation, to catch "your capital
+        # will be cut". It also caught "the capital will be divided evenly",
+        # which threatens nobody, and under boss capital authority the manager
+        # announces an allocation most rounds -- 21 of its 24 flagged
+        # statements were routine announcements. The verb has to say the money
+        # is going away; "cut" and "reduced" already match through the gap.
         r"\b(capital|budget|allocation(?! to)|funding)\b[^.]{0,40}"
         r"\b(cut|cuts|reduc\w*|slash\w*|reallocat\w*|strip\w*|shrink\w*|"
-        r"will be|is at risk|on the line|at stake)\b",
+        r"is at risk|on the line|at stake)\b",
         r"\bcapital follows performance\b",
     ),
     "rank_pressure": (

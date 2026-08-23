@@ -14,7 +14,7 @@ Four things happened. Each comes with how much weight it will bear, which is not
 
 *How much to trust it:* Little, as a claim about motives. The direction is clear but it rests on a couple of dozen events in total, and a manager visibly dividing money every round on the strength of what traders say may simply make them careful rather than honest.
 
-**The middle manager softened the pressure instead of passing it on,** in both setups. Threats to cut capital largely did not survive the trip down to the traders — Setup A: the founder in 31.2% of what it wrote privately, the manager in 0.4% of what it actually sent to traders; Setup B: the founder in 32.3% of what it wrote privately, the manager in 2.1% of what it actually sent to traders.
+**The middle manager softened the pressure instead of passing it on,** in both setups. Threats to cut capital largely did not survive the trip down to the traders — Setup A: the founder in 30.7% of what it wrote privately, the manager in 0.3% of what it actually sent to traders; Setup B: the founder in 32.0% of what it wrote privately, the manager in 0.3% of what it actually sent to traders.
 
 *How much to trust it:* Reasonably solid as a description of this model, and measured on more than a thousand messages. But it is one model, and how a manager talks is exactly the sort of thing training shapes.
 
@@ -30,7 +30,7 @@ Four things happened. Each comes with how much weight it will bear, which is not
 | Traders stayed quiet | 5.2% of decisions (63) | 3.9% of decisions (47) |
 | Did pressure change that? | 1.7% to 6.1%, unlikely to be chance | 3.3% to 4.1%, could be chance |
 | Traders lied | 23 of 1200 decisions | 4 of 1200 decisions |
-| Manager mentioned cutting capital | 0.4% of messages to traders | 2.1% of messages to traders |
+| Manager mentioned cutting capital | 0.3% of messages to traders | 0.3% of messages to traders |
 | Manager claimed a power it lacks | 0 messages | 3 messages |
 
 The two setups share their seeds, so the same markets were played in each and a difference between the columns is the setup, not the draw. The last row means different things in the two columns: in Setup A the manager controls nothing, so a promise to move money is a power it invented, while in Setup B it really does divide the money, so only a promise about somebody's job counts.
@@ -81,7 +81,7 @@ It should not be read as proof that these models will not lie for gain. Both fig
 
 ## What the manager did
 
-**When the manager could only talk, it softened the pressure rather than passing it on.** The founder raised the threat of cutting capital in 31.2% of the things it wrote privately. The manager raised it in 0.4% of the 1140 messages it actually sent to traders, and threatened anyone's job in 0% of them. The pressure did not survive the journey down.
+**When the manager could only talk, it softened the pressure rather than passing it on.** The founder raised the threat of cutting capital in 30.7% of the things it wrote privately. The manager raised it in 0.3% of the 1140 messages it actually sent to traders, and threatened anyone's job in 0% of them. The pressure did not survive the journey down.
 
 One caution about that comparison. The founder's own instructions contain the pressure wording, so a good deal of what it writes is repeating what it was handed rather than escalating on its own. The manager's near-zero figure is the more informative half, because nothing in the manager's instructions pushes it either way.
 
