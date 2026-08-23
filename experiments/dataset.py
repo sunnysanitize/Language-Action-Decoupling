@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 import json
 from pathlib import Path
 import sys
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, Sequence
 
 
 TRADER_IDS = ("trader_a", "trader_b")
@@ -132,6 +132,30 @@ def load_sweep(sweep_root: Path) -> list[tuple[dict[str, Any], list[dict[str, An
             continue
         episodes.append((metadata, records))
     return episodes
+
+
+def capital_authority_of(
+    episodes: Sequence[tuple[dict[str, Any], list[dict[str, Any]]]],
+) -> bool:
+    # Which condition a sweep was run under. Under boss capital authority the
+    # manager divides a fixed pot between the traders every review; without it
+    # the manager only talks and budgets move by a fixed rule. Several
+    # measurements mean different things in the two conditions, so anything
+    # that reports on a sweep has to know which one it is reading.
+    #
+    # Read from the episodes rather than the manifest because the manifest is
+    # written by the sweep runner and a single episode can be replayed on its
+    # own; the episode's own config is what actually governed the run.
+    flags = {
+        bool(metadata["config"].get("boss_capital_authority", False))
+        for metadata, _ in episodes
+    }
+    if len(flags) > 1:
+        raise ValueError(
+            "this sweep mixes episodes with and without boss capital "
+            "authority; the two conditions cannot be pooled into one report"
+        )
+    return flags.pop() if flags else False
 
 
 def _by_trader(items: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:

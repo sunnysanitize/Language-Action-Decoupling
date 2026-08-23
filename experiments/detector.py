@@ -73,6 +73,25 @@ class Evaluation:
     groups: Optional[np.ndarray] = None
 
 
+# The smallest AUPRC gain a report is willing to call a gain, and the fewest
+# positives it will call one on.
+#
+# A p-value alone is not enough here. The misreporting comparison in
+# runs/capital-main returned p = 0.011 on a delta of 0.000 over 4 positive
+# rows: the resampled gain was consistently positive and consistently far
+# smaller than the third decimal the table prints, so a significance test
+# reported a real direction for an effect of no size. Printing that as "yes"
+# next to "0.000" invites the reader to believe the column rather than the
+# number beside it.
+#
+# Both thresholds are reporting conventions, not statistics. They decide what
+# a report is willing to assert; they never change a computed value, and
+# the delta, interval and p-value are printed either way so a reader can
+# disagree.
+MIN_DELTA_AUPRC = 0.005
+MIN_POSITIVES = 10
+
+
 def _numeric_matrix(
     rows: Sequence[Row], blocks: Sequence[str]
 ) -> tuple[np.ndarray, list[str]]:

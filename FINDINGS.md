@@ -1,6 +1,39 @@
 # Rank pressure and dishonesty in a simulated trading firm
 
-Findings as of 22 August 2026. Written in plain language; the full technical results, with every interval and diagnostic, are in `RESULTS.md`.
+Findings as of 23 August 2026. Written in plain language; the full technical results, with every interval and diagnostic, are in `RESULTS.md`.
+
+## What to take away
+
+Four things happened. Each comes with how much weight it will bear, which is not decoration: some of these rest on a few dozen events and one of them does not survive being run a second time.
+
+**Pressure and staying quiet: the two setups disagree.** In Setup A applying any pressure at all raised how often traders stayed quiet, from 1.7% to 6.1%, and the gap is unlikely to be chance. In Setup B the same comparison gives 3.3% against 4.1% and could easily be chance. Same markets, same seeds, same model.
+
+*How much to trust it:* Weak. A finding that appears in one run of an experiment and not in its replication is a finding about that run. The whole effect is a few dozen decisions out of twelve hundred, which is few enough that this much movement between runs is expected.
+
+**Giving lying a payoff did not produce more lying.** Traders lied in 23 of 1200 decisions when it gained them nothing, and 4 of 1200 when it could win them capital.
+
+*How much to trust it:* Little, as a claim about motives. The direction is clear but it rests on a couple of dozen events in total, and a manager visibly dividing money every round on the strength of what traders say may simply make them careful rather than honest.
+
+**The middle manager softened the pressure instead of passing it on,** in both setups. Threats to cut capital largely did not survive the trip down to the traders — Setup A: the founder in 31.2% of what it wrote privately, the manager in 0.4% of what it actually sent to traders; Setup B: the founder in 32.3% of what it wrote privately, the manager in 2.1% of what it actually sent to traders.
+
+*How much to trust it:* Reasonably solid as a description of this model, and measured on more than a thousand messages. But it is one model, and how a manager talks is exactly the sort of thing training shapes.
+
+**The private note a trader writes to itself helps predict what it is about to do** — in both setups, for staying quiet when it cost the firm money. It also helped for staying quiet, but in one setup only.
+
+*How much to trust it:* Real but narrow, and probably not profound. The phrases doing the work are things like *not share* and *will not* — the note often just states the intention out loud. It helps in the moment and never a round ahead.
+
+### The two setups side by side
+
+|  | Setup A: manager only talks | Setup B: manager holds the money |
+|---|---|---|
+| Who decides the budgets | A fixed rule, applied to what traders really did | The manager, applied to what traders say they did |
+| Traders stayed quiet | 5.2% of decisions (63) | 3.9% of decisions (47) |
+| Did pressure change that? | 1.7% to 6.1%, unlikely to be chance | 3.3% to 4.1%, could be chance |
+| Traders lied | 23 of 1200 decisions | 4 of 1200 decisions |
+| Manager mentioned cutting capital | 0.4% of messages to traders | 2.1% of messages to traders |
+| Manager claimed a power it lacks | 0 messages | 3 messages |
+
+The two setups share their seeds, so the same markets were played in each and a difference between the columns is the setup, not the draw. The last row means different things in the two columns: in Setup A the manager controls nothing, so a promise to move money is a power it invented, while in Setup B it really does divide the money, so only a promise about somebody's job counts.
 
 ## What was run
 
@@ -38,7 +71,9 @@ The figures below are the share of trader-decisions in which each kind of dishon
 
 But the harsher settings did not produce more of it than the mild one. The peak is at pressure 1, not pressure 4, and a straight line fitted through all five levels is essentially flat (a slope of 0.008, where zero means no relationship at all). So the finding is that introducing rank pressure changes behaviour, not that more of it changes behaviour more.
 
-In Setup B the same comparison gives 3.3% with no pressure against 4.1% with pressure, appearing by chance in 63.6% of reshuffles.
+**Everything in the two paragraphs above is Setup A, and Setup B does not reproduce it.** There the same comparison gives 3.3% with no pressure against 4.1% with pressure, a gap that came up by chance in 63.6% of reshuffles — which is often enough that it may well be nothing.
+
+The two setups played the same markets under the same seeds, so this is not one of them getting an unluckier draw. The honest reading is that an effect resting on a few dozen decisions out of twelve hundred did not survive being run a second time, and a result that does not replicate is a result about the run rather than about the model.
 
 **Giving lying a payoff produced less lying, not more.** Traders lied in 23 of 1200 decisions when it gained them nothing (Setup A), and 4 of 1200 when it could win them capital (Setup B). That is the most surprising result here and it runs against the reason Setup B was built.
 
@@ -46,7 +81,7 @@ It should not be read as proof that these models will not lie for gain. Both fig
 
 ## What the manager did
 
-**When the manager could only talk, it softened the pressure rather than passing it on.** The founder raised the threat of cutting capital in 31.2% of the things it wrote privately. The manager raised it in 0.4% of the 1140 messages it actually sent to traders, and threatened anyone's job in 0.0% of them. The pressure did not survive the journey down.
+**When the manager could only talk, it softened the pressure rather than passing it on.** The founder raised the threat of cutting capital in 31.2% of the things it wrote privately. The manager raised it in 0.4% of the 1140 messages it actually sent to traders, and threatened anyone's job in 0% of them. The pressure did not survive the journey down.
 
 One caution about that comparison. The founder's own instructions contain the pressure wording, so a good deal of what it writes is repeating what it was handed rather than escalating on its own. The manager's near-zero figure is the more informative half, because nothing in the manager's instructions pushes it either way.
 
@@ -84,7 +119,9 @@ In this setup the manager has, in principle, enough information to catch a lie. 
 
 There is a limit to what the arithmetic can reveal. The desk result only constrains the total, so a mismatch shows that somebody lied without showing which of the two it was. An honest trader can therefore be punished for a colleague's dishonesty.
 
-In practice the manager questioned what it had been told in 0.4% of the 537 reviews where nobody had lied, and 0.0% of the 3 reviews where somebody had. The second figure is the one that matters: a manager that questions everything is not detecting anything.
+A counting note before the figures. 4 lies were told in this setup, but one of them came in a round the manager never reviewed — the last round of an episode has no review after it and no following round in which a budget could change. So everything in this section rests on 3, not 4.
+
+In practice the manager questioned what it had been told in 0.4% of the 537 reviews where nobody had lied, and 0% of the 3 reviews where somebody had. The second figure is the one that matters: a manager that questions everything is not detecting anything.
 
 We also checked whose story the manager's own arithmetic follows. Before splitting the money it states what it believes each trader contributed. We compared that belief against what really happened, and against what the traders' claims would imply if taken at face value.
 
@@ -100,15 +137,22 @@ Each trader writes a private note to itself before it acts. Nobody else ever see
 
 We built four predictors, each given progressively more to look at, and all using the same simple statistical method so that the only thing that differs is the information. The first sees only the trader's circumstances — the pressure level, its rank, its budget, how far behind it is, which round it is. The second adds the public record of the firm. The third adds the traders' private messages to each other. The fourth adds the private note.
 
-Each predictor is scored on how well it sorts the risky decisions to the top of a list. If you ranked at random you would score about as well as the underlying rate of the behaviour; a perfect ranking scores 1.0. We never test a predictor on episodes it was trained on.
+Each predictor is scored on how well it sorts the risky decisions to the top of a list. If you ranked at random you would score about as well as the underlying rate of the behaviour; a perfect ranking scores 1.0. We never test a predictor on episodes it was trained on. Both setups are scored separately below, because they produced different amounts of each behaviour to learn from.
 
-| Behaviour | Times it happened | Random guessing scores | Circumstances only | Plus private messages | Plus the private note | Chance of the gain being luck |
-|---|---|---|---|---|---|---|
-| Staying quiet | 63 | 0.052 | 0.241 | 0.218 | 0.229 | 31.6% |
-| Staying quiet when it cost the firm money | 41 | 0.034 | 0.096 | 0.102 | 0.154 | 0.1% |
-| Lying | 23 | 0.019 | 0.118 | 0.017 | 0.018 | 11.6% |
+| Behaviour | Setup | Times it happened | Random guessing scores | Circumstances only | Plus private messages | Plus the private note | Chance of the gain being luck |
+|---|---|---|---|---|---|---|---|
+| Staying quiet | A | 63 | 0.052 | 0.241 | 0.218 | 0.229 | 31.6% |
+| Staying quiet | B | 47 | 0.039 | 0.175 | 0.175 | 0.251 | under 0.05% |
+| Staying quiet when it cost the firm money | A | 41 | 0.034 | 0.096 | 0.102 | 0.154 | 0.1% |
+| Staying quiet when it cost the firm money | B | 34 | 0.028 | 0.134 | 0.164 | 0.256 | 0.2% |
+| Lying | A | 23 | 0.019 | 0.118 | 0.017 | 0.018 | 11.6% |
+| Lying | B | 4 | 0.003 | 0.002 | 0.002 | 0.002 | 1.1% |
 
-**The private note helps in one place only.** For predicting that a trader is about to stay quiet in a way that costs the firm money, adding the note produced a real improvement that is unlikely to be chance. For everything else it added nothing. And the improvement disappears entirely when we ask the harder question — predicting what a trader will do a round from now rather than in the moment.
+**The private note helps in some places and not others.** It adds real signal in both setups for: staying quiet when it cost the firm money. It also helped for staying quiet, but in one setup only, which is the kind of split that usually means the effect is smaller than the run can resolve.
+
+The question cannot be answered at all for lying in Setup B. There were too few of those to score a predictor on, so the figures in that row describe noise rather than skill, however small the last column looks.
+
+Whatever the note adds, it adds it only in the moment. Asked the harder question — predicting what a trader will do a round from now rather than what it is about to do — the gain disappears in both setups.
 
 The most likely explanation is unglamorous. The words carrying the most weight in the predictor are phrases like *not share*, *will not*, and *will share*. The note sometimes simply states the intention out loud. That is useful for catching something as it happens, and it is not evidence that private reasoning forecasts behaviour.
 
@@ -119,6 +163,8 @@ The most likely explanation is unglamorous. The words carrying the most weight i
 **Two traders is barely an organisation.** With one colleague there is nobody to form an alliance with, nobody to blame, and exactly one person to keep a secret from. Most of what makes organisational misconduct interesting needs a third participant.
 
 **The traders are told to care about their own ranking.** Their instructions say they are judged individually as well as collectively. Behaviour that follows from an instruction is the model doing as it is told, not the model revealing something about itself. A version of this experiment without that wording would make a much stronger claim.
+
+**The headline effect did not replicate.** Applying any pressure raised how often traders stayed quiet in Setup A and did not in Setup B, on the same seeds. Both figures are in this document and neither is hidden, but a reader should treat the pressure result as unsettled rather than as something this experiment established.
 
 **Lying is measured on very few cases.** Even with a payoff attached it stayed rare, so every statement here about lying rests on a handful of events and should be treated as provisional.
 
