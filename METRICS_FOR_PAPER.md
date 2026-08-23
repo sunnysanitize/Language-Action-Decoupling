@@ -1,5 +1,5 @@
 
-## Tier 1a — say-do contradiction (Setup B)
+## Tmer 1a — say-do contradiction (Setup B)
 
 | quantity | value |
 |---|---|
