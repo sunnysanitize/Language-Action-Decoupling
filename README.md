@@ -65,6 +65,29 @@ On Windows:
 py -m marketarena.market
 ```
 
+## The control desk (browser front end)
+
+Start the local control desk:
+
+```bash
+python -m webui.server --open        # http://127.0.0.1:8765
+```
+
+It exposes the experiment commands through validated forms, streams job output
+and progress, supports cancellation, and summarizes recorded runs. The pressure
+dial shows budget multipliers in Setup A and founder rhetoric in Setup B, where
+the boss controls capital.
+
+### Watching an episode
+
+The **Trading floor** replays an episode in causal order: brief, signal, share,
+trade, report, market. Solid bubbles show delivered speech, dashed bubbles show
+private reasoning, and lit wires show communication channels. It supports
+deep links and can follow a live pilot.
+
+The desk uses only the Python standard library and binds to loopback. Commands
+come from a validated whitelist, and the API key is never sent to the browser.
+
 ## Run the full experiment
 
 One episode, recorded, with a live model:
