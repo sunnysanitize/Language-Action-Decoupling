@@ -176,13 +176,6 @@ header {
   text-transform: uppercase;
 }
 
-.brand .tag {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
 /* The mark: a 5x5 pixel grid drawn with box-shadow, no image asset. */
 .mark {
   width: 20px;
@@ -524,6 +517,31 @@ select {
   border-top: 2px solid var(--color-border);
 }
 
+/* The two experiment arms. Wider cells than the pressure dial because these
+ * carry names rather than digits, and the definition of whichever one is
+ * selected sits directly underneath. */
+.arms { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+.arms button {
+  padding: 8px 4px;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.arms button[aria-pressed='true'] {
+  background: var(--color-accent);
+  border-color: var(--color-accent-bright);
+  color: #fff;
+}
+
+.arm-note {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+  background: var(--color-bg-dark);
+  border-left: 2px solid var(--color-accent);
+  padding: 6px 8px;
+}
+
 .form-error {
   font-family: var(--font-mono);
   font-size: 11.5px;
@@ -833,19 +851,50 @@ table.data tr:last-child td { border-bottom: none; }
 .phase-rail button.now { color: #fff; border-color: currentColor; }
 .phase-rail button:active:not(:disabled) { transform: none; }
 
+/* flex-basis 0, not auto. With `auto` the wrapper's base size is its content
+ * -- the canvas -- and the renderer measures the wrapper to decide how big to
+ * make that canvas, which is a loop that settles wherever it started. A zero
+ * basis makes the wrapper purely "whatever height is left", so it is an
+ * independent input to the fit calculation.
+ *
+ * overflow: hidden, not auto, because the renderer now fits the stage to this
+ * box on both axes. A scrollbar here would mean the fit is wrong. */
 .stage-wrap {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
+  flex: 1 1 0%;
+  /* A floor squeezed to 50px is not a smaller floor, it is no floor. Below
+   * this the panel scrolls instead (see #view-floor) -- which only happens in
+   * a window too short to show the thing at all. */
+  min-height: 190px;
+  overflow: hidden;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   background: #12121e;
   border: 2px solid var(--color-border);
   box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.5);
   padding: 6px;
 }
-#view-floor .stage-wrap { flex: 1 1 auto; }
+#view-floor .stage-wrap { flex: 1 1 0%; }
+
+/* The safety valve. The stage fits itself to this panel on both axes, so the
+ * floor itself never scrolls; this catches only the case where the window is
+ * too short for the controls, the rail, a legible stage and the HUD together. */
+/* Stacked layout: the document scrolls and no ancestor has a definite height,
+ * so a zero flex-basis would collapse the stage to nothing. Give it a real
+ * height to fit against.
+ *
+ * This lives here, below the base .stage-wrap rule, rather than up with the
+ * other narrow-layout overrides: a media query adds no specificity, so between
+ * two `.stage-wrap` rules the later one simply wins. Moved up there, this one
+ * silently loses and the stage falls back to its min-height. */
+@media (max-width: 1200px) {
+  /* Matching #view-floor .stage-wrap, not a bare .stage-wrap: that rule is
+   * more specific and would keep flex-basis at 0%, which wins over `height`
+   * on a flex item's main axis and leaves the stage at its min-height. */
+  #view-floor .stage-wrap { flex: none; height: min(58vh, 520px); }
+}
+
+#view-floor { overflow-y: auto; }
 
 .stage { position: relative; flex: none; }
 .bubble-layer { overflow: hidden; }

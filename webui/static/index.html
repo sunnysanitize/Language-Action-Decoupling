@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>MarketArena Control Desk</title>
+<title>LLM-OrgSim Control Desk</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231e1e2e'/><rect x='3' y='3' width='10' height='10' fill='%236030ff'/><rect x='5' y='5' width='3' height='3' fill='%2389d185'/><rect x='9' y='9' width='3' height='3' fill='%23ff8d14'/></svg>" />
 <link rel="stylesheet" href="/static/style.css" />
 </head>
@@ -12,10 +12,7 @@
   <header>
     <div class="brand">
       <div class="mark" aria-hidden="true"></div>
-      <div>
-        <h1>MarketArena</h1>
-        <div class="tag">rank pressure &middot; control desk</div>
-      </div>
+      <h1>LLM-OrgSim</h1>
     </div>
     <div id="env-chips" class="button-row" aria-live="polite"></div>
     <button id="refresh" class="small" title="Reload runs and environment">Refresh</button>
@@ -79,9 +76,9 @@
 
         <div class="panel-body" id="view-floor" hidden style="flex:1; min-height:0;">
           <div class="floor-bar">
-            <button class="small" id="floor-back" title="Previous beat">&#9664;&#9664;</button>
+            <button class="small" id="floor-back" title="Previous event (left arrow)">&#9664;&#9664;</button>
             <button class="small primary" id="floor-play" title="Play / pause (space)">Play</button>
-            <button class="small" id="floor-next" title="Next beat">&#9654;&#9654;</button>
+            <button class="small" id="floor-next" title="Next event (right arrow)">&#9654;&#9654;</button>
             <label class="chip" style="cursor:pointer" title="Playback speed">
               Speed
               <select id="floor-speed" style="width:auto;padding:1px 4px;font-size:11px">
