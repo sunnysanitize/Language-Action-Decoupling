@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MarketArena Control Desk</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231e1e2e'/><rect x='3' y='3' width='10' height='10' fill='%236030ff'/><rect x='5' y='5' width='3' height='3' fill='%2389d185'/><rect x='9' y='9' width='3' height='3' fill='%23ff8d14'/></svg>" />
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<div id="desk">
+  <header>
+    <div class="brand">
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>MarketArena</h1>
+        <div class="tag">rank pressure &middot; control desk</div>
+      </div>
+    </div>
+    <div id="env-chips" class="button-row" aria-live="polite"></div>
+    <button id="refresh" class="small" title="Reload runs and environment">Refresh</button>
+  </header>
+
+  <div id="columns">
+    <!-- LEFT: pick a command, set its parameters, launch it. -->
+    <div class="column" id="column-launch">
+      <section class="panel">
+        <h2>Launch</h2>
+        <div class="panel-body">
+          <div class="command-grid" id="command-grid" role="group" aria-label="Command"></div>
+          <p class="blurb" id="command-blurb"></p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Parameters <span class="count" id="param-count"></span></h2>
+        <div class="panel-body">
+          <form id="params" autocomplete="off"></form>
+          <div class="action-bar">
+            <div class="form-error" id="form-error" hidden></div>
+            <button type="button" class="primary wide" id="launch">Start</button>
+            <div class="note-line" id="argv-preview"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- CENTRE: what is running, and what it is saying. -->
+    <div class="column" id="column-console">
+      <section class="panel">
+        <h2>Jobs <span class="count" id="job-count"></span>
+          <button class="small" id="clear-jobs" title="Forget finished jobs">Clear</button>
+        </h2>
+        <div class="panel-body">
+          <div class="job-list" id="job-list"></div>
+        </div>
+      </section>
+
+      <section class="panel grow">
+        <h2>
+          <span class="tabs" role="tablist">
+            <button role="tab" id="tab-console" aria-selected="true">Console</button>
+            <button role="tab" id="tab-floor" aria-selected="false">Trading floor</button>
+          </span>
+          <span class="count" id="console-title"></span>
+        </h2>
+
+        <div class="panel-body" id="view-console" style="flex:1; min-height:0;">
+          <div class="console-bar">
+            <span id="console-status"></span>
+            <span class="argv" id="console-argv"></span>
+            <label class="chip" style="cursor:pointer">
+              <input type="checkbox" id="autoscroll" checked style="width:auto" /> Follow
+            </label>
+            <button class="small danger" id="stop-job" disabled>Stop</button>
+          </div>
+          <pre id="console" tabindex="0"><span class="l-dim">No job selected. Start something on the left, or pick a job above.</span></pre>
+        </div>
+
+        <div class="panel-body" id="view-floor" hidden style="flex:1; min-height:0;">
+          <div class="floor-bar">
+            <button class="small" id="floor-back" title="Previous beat">&#9664;&#9664;</button>
+            <button class="small primary" id="floor-play" title="Play / pause (space)">Play</button>
+            <button class="small" id="floor-next" title="Next beat">&#9654;&#9654;</button>
+            <label class="chip" style="cursor:pointer" title="Playback speed">
+              Speed
+              <select id="floor-speed" style="width:auto;padding:1px 4px;font-size:11px">
+                <option value="0.5">0.5x</option>
+                <option value="1" selected>1x</option>
+                <option value="2">2x</option>
+                <option value="4">4x</option>
+              </select>
+            </label>
+            <span class="floor-round" id="floor-round"></span>
+            <label class="chip" style="cursor:pointer" title="Follow the running episode as rounds land">
+              <input type="checkbox" id="floor-follow" style="width:auto" /> Follow live
+            </label>
+          </div>
+
+          <div class="phase-rail" id="phase-rail"></div>
+
+          <div class="stage-wrap">
+            <div class="stage" id="stage">
+              <canvas></canvas>
+              <div class="bubble-layer"></div>
+            </div>
+          </div>
+
+          <div class="floor-hud" id="floor-hud"></div>
+          <div class="floor-empty" id="floor-empty">
+            Pick an episode in <strong>Runs</strong> to watch it play out.
+            A sweep is sixty episodes &mdash; open one of them.
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT: what is already on disk. -->
+    <div class="column" id="column-runs">
+      <section class="panel">
+        <h2>Runs <span class="count" id="run-count"></span></h2>
+        <div class="panel-body">
+          <div class="filter-row">
+            <input type="text" id="run-filter" placeholder="filter by id..." />
+          </div>
+          <div class="job-list scroll" id="run-list" style="max-height:300px"></div>
+        </div>
+      </section>
+
+      <section class="panel grow">
+        <h2>Detail <span class="count" id="detail-title"></span></h2>
+        <div class="panel-body" id="detail">
+          <div class="empty">Pick a run to read its labels.</div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+<script src="/static/sprites.js"></script>
+<script src="/static/floor.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
