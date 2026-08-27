@@ -1,4 +1,4 @@
-/* MarketArena control desk.
+/* LLM-OrgSim control desk.
  *
  * Vanilla DOM, no framework and no build step, for the same reason the server
  * is stdlib-only: this repo's simulator runs on a bare checkout and the desk
@@ -73,10 +73,6 @@ function renderEnvironment() {
     'Provider', broken ? 'unusable' : (env.model || 'configured'));
   providerChip.title = env.provider_problem || `${env.endpoint} / ${env.model}`;
   box.append(providerChip);
-
-  const missing = Object.entries(env.packages).filter(([, ok]) => !ok).map(([name]) => name);
-  box.append(chip(missing.length ? 'warn' : 'ok', missing.length ? 'warn' : 'ok',
-    'Deps', missing.length ? `missing ${missing.join(', ')}` : 'complete'));
 
   box.append(chip('', '', 'Python', env.python));
 }
@@ -182,7 +178,14 @@ function showFormError(message) {
 }
 
 function renderField(command, field, values) {
-  if (field.kind === 'bool') return booleanField(command, field, values);
+  // A bool carrying two named choices is an arm of the experiment, not an
+  // option: render it as a picker so "Setup A" is something you select rather
+  // than the absence of a tick.
+  if (field.kind === 'bool') {
+    return field.choices.length === 2
+      ? armField(command, field, values)
+      : booleanField(command, field, values);
+  }
 
   const label = el('label', { for: `f-${field.name}` }, [field.label]);
   const wrap = el('div', { class: 'field' }, [label]);
@@ -321,6 +324,32 @@ function booleanField(command, field, values) {
       field.label,
       field.help ? el('span', { class: 'hint', text: field.help }) : null,
     ]),
+  ]);
+}
+
+/* The Setup A / Setup B picker. Both arms are always named and the selected
+ * one's definition is spelled out underneath, so nobody has to remember which
+ * way the flag points or what it changes. */
+function armField(command, field, values) {
+  const current = values[field.name];
+  const chosen = field.choices.find((c) => String(c.value) === String(current)) || field.choices[0];
+
+  const buttons = el('div', { class: 'arms', role: 'group', 'aria-label': field.label });
+  for (const choice of field.choices) {
+    buttons.append(el('button', {
+      type: 'button',
+      'aria-pressed': String(String(choice.value) === String(current)),
+      text: choice.label,
+      // Choosing an arm re-renders the whole form: the pressure dial and
+      // several hints describe the other condition once it changes.
+      onclick: () => { setValue(command, field.name, choice.value); renderForm(); },
+    }));
+  }
+
+  return el('div', { class: 'field' }, [
+    el('label', {}, [field.label]),
+    buttons,
+    el('div', { class: 'arm-note', text: chosen ? chosen.note : '' }),
   ]);
 }
 
@@ -479,7 +508,11 @@ function renderRuns() {
 }
 
 function runCard(run) {
-  const badges = [el('span', { class: `badge setup-${run.setup.toLowerCase()}`, text: `Setup ${run.setup}` })];
+  const badges = [el('span', {
+    class: `badge setup-${run.setup.toLowerCase()}`,
+    text: `Setup ${run.setup}`,
+    title: setupBlurb(run.setup),
+  })];
   const meta = [];
   if (run.kind === 'sweep') {
     badges.unshift(el('span', { class: 'badge sweep', text: run.in_progress ? 'sweep*' : 'sweep' }));
@@ -733,10 +766,10 @@ async function loadScene(path) {
     floor.pending = null;
     if (wanted && wanted.round) {
       view.goToRound(wanted.round - 1);
-      if (wanted.beat && wanted.beat > 1) {
-        view.beatIndex = Math.min(wanted.beat - 1, Math.max(0, view.beats.length - 1));
-        view.beatClock = 0;
-        view.applyBeat();
+      if (wanted.event && wanted.event > 1) {
+        view.eventIndex = Math.min(wanted.event - 1, Math.max(0, view.events.length - 1));
+        view.eventClock = 0;
+        view.applyEvent();
       }
     }
     renderFloorChrome(view);
@@ -758,25 +791,29 @@ function renderFloorChrome(view) {
   const round = view.round;
   $('floor-round').replaceChildren(
     el('span', { html: `round <strong>${round ? round.round : '-'}</strong> / ${scene.rounds.length}` }),
-    document.createTextNode(`  ·  beat ${view.beatIndex + 1}/${view.beats.length}`),
-    document.createTextNode(`  ·  setup ${scene.setup}, pressure ${scene.pressure}`),
+    document.createTextNode(`  ·  event ${view.eventIndex + 1}/${view.events.length}`),
+    el('span', {
+      text: `  ·  setup ${scene.setup}, pressure ${scene.pressure}`,
+      title: setupBlurb(scene.setup),
+      style: 'cursor:help',
+    }),
   );
 
   // Phase rail: which of the six phases of this round have played.
-  const beat = view.beat;
-  const played = new Set(view.beats.slice(0, view.beatIndex + 1).map((item) => item.phase));
+  const roundEvent = view.currentEvent;
+  const played = new Set(view.events.slice(0, view.eventIndex + 1).map((item) => item.phase));
   const rail = $('phase-rail');
   rail.replaceChildren();
   for (const phase of scene.phases) {
-    const isNow = beat && beat.phase === phase.id;
+    const isNow = roundEvent && roundEvent.phase === phase.id;
     const node = el('button', {
       type: 'button',
       class: isNow ? 'now' : (played.has(phase.id) ? 'done' : ''),
       title: phase.note,
       text: phase.label,
       onclick: () => {
-        const index = view.beats.findIndex((item) => item.phase === phase.id);
-        if (index >= 0) { view.beatIndex = index; view.beatClock = 0; view.applyBeat(); view.emit(); }
+        const index = view.events.findIndex((item) => item.phase === phase.id);
+        if (index >= 0) { view.eventIndex = index; view.eventClock = 0; view.applyEvent(); view.emit(); }
       },
     });
     if (isNow) node.style.color = ({
@@ -789,6 +826,20 @@ function renderFloorChrome(view) {
   renderFloorHud(view);
 }
 
+/* The one description of each arm, taken from the command spec the server
+ * already sends, so the badges and the launch form cannot disagree about what
+ * Setup A means. */
+function setupBlurb(letter) {
+  for (const command of state.commands) {
+    for (const field of command.fields) {
+      for (const choice of field.choices || []) {
+        if (choice.label === `Setup ${letter}`) return choice.note;
+      }
+    }
+  }
+  return `Setup ${letter}`;
+}
+
 const SWATCH = { ken_griffin: '#6030ff', boss_1: '#3794ff', trader_a: '#ff8d14', trader_b: '#89d185' };
 
 function renderFloorHud(view) {
@@ -797,11 +848,11 @@ function renderFloorHud(view) {
   box.replaceChildren();
   if (!round) return;
 
-  // Pre-round state until the market beat plays, post-round after it. Showing
+  // Pre-round state until the market event plays, post-round after it. Showing
   // the post-round budget during the share phase would put a number on screen
   // that the trader deciding to share could not have known.
-  const beat = view.beat;
-  const settled = beat && beat.phase === 'market';
+  const roundEvent = view.currentEvent;
+  const settled = roundEvent && roundEvent.phase === 'market';
   const states = (settled ? round.post_states : round.pre_states) || [];
   const budgets = states.map((state) => state.budget || 0);
   const widest = Math.max(0.001, ...budgets);
@@ -992,7 +1043,7 @@ $('params').addEventListener('keydown', (event) => {
 function hashState() {
   const parsed = new URLSearchParams(location.hash.slice(1));
   const number = (key) => (parsed.get(key) === null ? null : Number(parsed.get(key)));
-  return { run: parsed.get('run'), tab: parsed.get('tab'), round: number('round'), beat: number('beat') };
+  return { run: parsed.get('run'), tab: parsed.get('tab'), round: number('round'), event: number('event') };
 }
 
 function writeHash() {
@@ -1004,7 +1055,7 @@ function writeHash() {
     // thing worth sending someone, and it is one line to make it a link.
     if (floor.view && floor.scene) {
       parsed.set('round', String(floor.view.roundIndex + 1));
-      parsed.set('beat', String(floor.view.beatIndex + 1));
+      parsed.set('event', String(floor.view.eventIndex + 1));
     }
   }
   const next = `#${parsed.toString()}`;
@@ -1014,7 +1065,7 @@ function writeHash() {
 window.addEventListener('hashchange', () => {
   const wanted = hashState();
   if (wanted.run && wanted.run !== state.run) {
-    if (wanted.round) floor.pending = { round: wanted.round, beat: wanted.beat };
+    if (wanted.round) floor.pending = { round: wanted.round, event: wanted.event };
     if (wanted.tab && wanted.tab !== floor.tab) showTab(wanted.tab);
     openRun(wanted.run, { push: false });
     return;
@@ -1025,7 +1076,7 @@ window.addEventListener('hashchange', () => {
 refresh()
   .then(() => {
     const wanted = hashState();
-    if (wanted.round) floor.pending = { round: wanted.round, beat: wanted.beat };
+    if (wanted.round) floor.pending = { round: wanted.round, event: wanted.event };
     if (wanted.tab === 'floor') showTab('floor');
     return wanted.run ? openRun(wanted.run, { push: false }) : null;
   })

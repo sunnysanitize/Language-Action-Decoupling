@@ -1,4 +1,4 @@
-# Turns one recorded episode into an ordered list of beats a trading floor can
+# Turns one recorded episode into an ordered list of events a trading floor can
 # act out: who thought what, who said what to whom, and what it cost.
 #
 # Presentation only. Nothing here feeds a label or a detector -- experiments/
@@ -18,8 +18,8 @@
 #
 # Two honesty rules the renderer depends on:
 #
-#   * A THINK beat is private_reasoning. It was never shown to another agent.
-#   * A SAY beat is something that actually reached someone: a Message, or a
+#   * A THINK event is private_reasoning. It was never shown to another agent.
+#   * A SAY event is something that actually reached someone: a Message, or a
 #     BossFeedback item, or the overseer's delivered directive.
 #
 # The overseer is the awkward one. rounds.jsonl keeps only its
@@ -92,10 +92,10 @@ PHASES: tuple[dict, ...] = (
 )
 
 
-def _beat(phase: str, actor: str, kind: str, text: str, **extra) -> dict:
-    beat = {"phase": phase, "actor": actor, "kind": kind, "text": text}
-    beat.update(extra)
-    return beat
+def _event(phase: str, actor: str, kind: str, text: str, **extra) -> dict:
+    event = {"phase": phase, "actor": actor, "kind": kind, "text": text}
+    event.update(extra)
+    return event
 
 
 def _traces(record: dict, actor: str, phase: str) -> list[str]:
@@ -145,27 +145,27 @@ def _by_trader(items: list[dict], key: str) -> dict[str, Any]:
     return {item["trader_id"]: item.get(key) for item in items if "trader_id" in item}
 
 
-def round_beats(record: dict, spoken: dict[str, str]) -> list[dict]:
-    beats: list[dict] = []
+def round_events(record: dict, spoken: dict[str, str]) -> list[dict]:
+    events: list[dict] = []
 
     # ---------------------------------------------------------------- brief
     for phase_name in ("mandate", "pre_review"):
         for reasoning in _traces(record, OVERSEER_ID, phase_name):
-            beats.append(
-                _beat("brief", OVERSEER_ID, "think", reasoning, to=None)
+            events.append(
+                _event("brief", OVERSEER_ID, "think", reasoning, to=None)
             )
             directive = spoken.get(reasoning.strip())
             if directive:
-                beats.append(
-                    _beat("brief", OVERSEER_ID, "say", directive, to=BOSS_ID)
+                events.append(
+                    _event("brief", OVERSEER_ID, "say", directive, to=BOSS_ID)
                 )
         for reasoning in _traces(record, BOSS_ID, phase_name):
-            beats.append(_beat("brief", BOSS_ID, "think", reasoning, to=None))
+            events.append(_event("brief", BOSS_ID, "think", reasoning, to=None))
 
     for item in record.get("delivered_feedback", []):
         target = item.get("trader_id")
-        beats.append(
-            _beat(
+        events.append(
+            _event(
                 "brief",
                 BOSS_ID,
                 "say",
@@ -186,8 +186,8 @@ def round_beats(record: dict, spoken: dict[str, str]) -> list[dict]:
         for trader_id in TRADER_IDS:
             if trader_id not in budgets:
                 continue
-            beats.append(
-                _beat(
+            events.append(
+                _event(
                     "brief",
                     BOSS_ID,
                     "act",
@@ -205,8 +205,8 @@ def round_beats(record: dict, spoken: dict[str, str]) -> list[dict]:
     for observation in record.get("observations", []):
         signal = observation.get("signal")
         accuracy = observation.get("signal_accuracy")
-        beats.append(
-            _beat(
+        events.append(
+            _event(
                 "signal",
                 observation.get("trader_id", "?"),
                 "signal",
@@ -218,7 +218,7 @@ def round_beats(record: dict, spoken: dict[str, str]) -> list[dict]:
     # ---------------------------------------------------------------- share
     #
     # Withholding is decided here and nowhere else, so the label is attached to
-    # this phase rather than left to the market beat where its cost is known.
+    # this phase rather than left to the market event where its cost is known.
     withheld = {
         label["trader_id"]: label
         for label in record.get("withholding_labels", [])
@@ -226,11 +226,11 @@ def round_beats(record: dict, spoken: dict[str, str]) -> list[dict]:
     }
     for trader_id in TRADER_IDS:
         for reasoning in _traces(record, trader_id, "pre_share"):
-            beats.append(_beat("share", trader_id, "think", reasoning))
+            events.append(_event("share", trader_id, "think", reasoning))
     for message in record.get("messages", []):
         sender = message.get("sender_id", "?")
-        beats.append(
-            _beat(
+        events.append(
+            _event(
                 "share",
                 sender,
                 "say",
@@ -243,8 +243,8 @@ def round_beats(record: dict, spoken: dict[str, str]) -> list[dict]:
         )
     for trader_id, label in withheld.items():
         if label.get("withheld"):
-            beats.append(
-                _beat(
+            events.append(
+                _event(
                     "share",
                     trader_id,
                     "label",
@@ -260,14 +260,14 @@ def round_beats(record: dict, spoken: dict[str, str]) -> list[dict]:
     executed = _by_trader(record.get("executions", []), "executed_position")
     for trader_id in TRADER_IDS:
         for reasoning in _traces(record, trader_id, "pre_trade"):
-            beats.append(_beat("trade", trader_id, "think", reasoning))
+            events.append(_event("trade", trader_id, "think", reasoning))
     for item in record.get("executions", []):
         trader_id = item.get("trader_id", "?")
         want = item.get("requested_position", 0.0)
         got = item.get("executed_position", 0.0)
         clipped = abs(want - got) > 1e-9
-        beats.append(
-            _beat(
+        events.append(
+            _event(
                 "trade",
                 trader_id,
                 "act",
@@ -284,13 +284,13 @@ def round_beats(record: dict, spoken: dict[str, str]) -> list[dict]:
     }
     for trader_id in TRADER_IDS:
         for reasoning in _traces(record, trader_id, "pre_report"):
-            beats.append(_beat("report", trader_id, "think", reasoning))
+            events.append(_event("report", trader_id, "think", reasoning))
     for item in record.get("reports", []):
         trader_id = item.get("trader_id", "?")
         claimed = item.get("reported_position", 0.0)
         label = misreported.get(trader_id, {})
-        beats.append(
-            _beat(
+        events.append(
+            _event(
                 "report",
                 trader_id,
                 "say",
@@ -308,8 +308,8 @@ def round_beats(record: dict, spoken: dict[str, str]) -> list[dict]:
     # --------------------------------------------------------------- market
     world = record.get("world") or {}
     direction = world.get("market_direction")
-    beats.append(
-        _beat(
+    events.append(
+        _event(
             "market",
             "market",
             "system",
@@ -319,8 +319,8 @@ def round_beats(record: dict, spoken: dict[str, str]) -> list[dict]:
     )
     for item in record.get("ledger", []):
         pnl = item.get("pnl", 0.0)
-        beats.append(
-            _beat(
+        events.append(
+            _event(
                 "market",
                 item.get("trader_id", "?"),
                 "pnl",
@@ -328,7 +328,7 @@ def round_beats(record: dict, spoken: dict[str, str]) -> list[dict]:
                 data={"pnl": pnl, "position": item.get("position")},
             )
         )
-    return beats
+    return events
 
 
 def episode_scene(directory: Path) -> dict:
@@ -345,7 +345,7 @@ def episode_scene(directory: Path) -> dict:
                 "world": record.get("world") or {},
                 "pre_states": record.get("pre_round_states", []),
                 "post_states": record.get("post_round_states", []),
-                "beats": round_beats(record, spoken),
+                "events": round_events(record, spoken),
             }
         )
 

@@ -422,7 +422,7 @@ class ServerTests(unittest.TestCase):
 
     def test_the_page_and_its_assets_are_served(self):
         for path, needle in (
-            ("/", b"MarketArena"),
+            ("/", b"LLM-OrgSim"),
             ("/static/style.css", b"--color-accent"),
             ("/static/app.js", b"api/jobs"),
         ):
@@ -487,7 +487,7 @@ class ServerTests(unittest.TestCase):
 
 
 class FloorplanTests(unittest.TestCase):
-    """The trading floor's beat list.
+    """The trading floor's roundEvent list.
 
     The order is the point. Supervision reaches traders before they decide, so
     a scene that played the brief after the share phase would animate the
@@ -565,32 +565,32 @@ class FloorplanTests(unittest.TestCase):
         return floorplan.episode_scene(self.write(records, **kwargs))
 
     def test_phases_run_in_narrative_order(self):
-        beats = self.scene([self.record()])["rounds"][0]["beats"]
+        events = self.scene([self.record()])["rounds"][0]["events"]
         order = [phase["id"] for phase in floorplan.PHASES]
-        seen = [beat["phase"] for beat in beats]
+        seen = [roundEvent["phase"] for roundEvent in events]
         positions = [order.index(phase) for phase in seen]
         self.assertEqual(positions, sorted(positions), seen)
 
     def test_supervision_lands_before_anyone_trades(self):
-        beats = self.scene([self.record()])["rounds"][0]["beats"]
-        first_brief = next(i for i, b in enumerate(beats) if b["phase"] == "brief")
-        first_share = next(i for i, b in enumerate(beats) if b["phase"] == "share")
+        events = self.scene([self.record()])["rounds"][0]["events"]
+        first_brief = next(i for i, b in enumerate(events) if b["phase"] == "brief")
+        first_share = next(i for i, b in enumerate(events) if b["phase"] == "share")
         self.assertLess(first_brief, first_share)
 
-    def test_private_reasoning_is_never_a_say_beat(self):
+    def test_private_reasoning_is_never_a_say_event(self):
         # The role contract's hardest line: a scratchpad was shown to nobody.
         # Rendering one as speech would put words in an agent's mouth that no
         # other agent ever heard.
-        beats = self.scene([self.record()])["rounds"][0]["beats"]
+        events = self.scene([self.record()])["rounds"][0]["events"]
         reasoning = {"founder thinking", "boss thinking", "a share thinking",
                      "a trade thinking", "a report thinking"}
-        for beat in beats:
-            if beat["text"] in reasoning:
-                self.assertEqual(beat["kind"], "think", beat)
+        for roundEvent in events:
+            if roundEvent["text"] in reasoning:
+                self.assertEqual(roundEvent["kind"], "think", roundEvent)
 
-    def test_a_message_is_a_say_beat_carrying_its_shared_signal(self):
-        beats = self.scene([self.record()])["rounds"][0]["beats"]
-        said = next(b for b in beats if b["text"] == "hello")
+    def test_a_message_is_a_say_event_carrying_its_shared_signal(self):
+        events = self.scene([self.record()])["rounds"][0]["events"]
+        said = next(b for b in events if b["text"] == "hello")
         self.assertEqual(said["kind"], "say")
         self.assertEqual(said["phase"], "share")
         self.assertEqual(said["shared_signal"], 1)
@@ -606,26 +606,26 @@ class FloorplanTests(unittest.TestCase):
                                  "withheld": True, "occurred": True,
                                  "counterfactual_profit_delta": 0.4}],
         )
-        beats = self.scene([record])["rounds"][0]["beats"]
-        flag = next(b for b in beats if b.get("label") == "withheld")
+        events = self.scene([record])["rounds"][0]["events"]
+        flag = next(b for b in events if b.get("label") == "withheld")
         self.assertEqual(flag["phase"], "share")
         self.assertTrue(flag["costly"])
 
-    def test_misreporting_is_flagged_on_the_report_beat(self):
+    def test_misreporting_is_flagged_on_the_report_event(self):
         record = self.record(
             reports=[{"trader_id": "trader_a", "reported_position": 1.0}],
             misreporting_labels=[{"trader_id": "trader_a", "occurred": True,
                                   "position_difference": 0.5, "dollar_difference": 0.5}],
         )
-        beats = self.scene([record])["rounds"][0]["beats"]
-        report = next(b for b in beats if b["phase"] == "report" and b["kind"] == "say")
+        events = self.scene([record])["rounds"][0]["events"]
+        report = next(b for b in events if b["phase"] == "report" and b["kind"] == "say")
         self.assertEqual(report["label"], "misreported")
         self.assertEqual(report["data"]["reported"], 1.0)
         self.assertEqual(report["data"]["executed"], 0.5)
 
-    def test_a_budget_clip_is_visible_on_the_trade_beat(self):
-        beats = self.scene([self.record()])["rounds"][0]["beats"]
-        trade = next(b for b in beats if b["phase"] == "trade" and b["kind"] == "act")
+    def test_a_budget_clip_is_visible_on_the_trade_event(self):
+        events = self.scene([self.record()])["rounds"][0]["events"]
+        trade = next(b for b in events if b["phase"] == "trade" and b["kind"] == "act")
         self.assertTrue(trade["data"]["clipped"])
         self.assertIn("budget clipped", trade["text"])
 
@@ -636,8 +636,8 @@ class FloorplanTests(unittest.TestCase):
             "tag": "ken_griffin", "status": "ok",
             "response": {"private_reasoning": "founder thinking", "content": "cut the bottom"},
         }]
-        beats = self.scene([self.record()], calls=calls)["rounds"][0]["beats"]
-        spoken = [b for b in beats if b["actor"] == "ken_griffin" and b["kind"] == "say"]
+        events = self.scene([self.record()], calls=calls)["rounds"][0]["events"]
+        spoken = [b for b in events if b["actor"] == "ken_griffin" and b["kind"] == "say"]
         self.assertEqual(len(spoken), 1)
         self.assertEqual(spoken[0]["text"], "cut the bottom")
         self.assertEqual(spoken[0]["to"], "boss_1")
@@ -648,23 +648,23 @@ class FloorplanTests(unittest.TestCase):
             "response": {"private_reasoning": "some other round", "content": "unrelated"},
         }]
         scene = self.scene([self.record()], calls=calls)
-        beats = scene["rounds"][0]["beats"]
-        self.assertFalse([b for b in beats if b["actor"] == "ken_griffin" and b["kind"] == "say"])
-        self.assertTrue([b for b in beats if b["actor"] == "ken_griffin" and b["kind"] == "think"])
+        events = scene["rounds"][0]["events"]
+        self.assertFalse([b for b in events if b["actor"] == "ken_griffin" and b["kind"] == "say"])
+        self.assertTrue([b for b in events if b["actor"] == "ken_griffin" and b["kind"] == "think"])
 
     def test_no_calls_file_still_builds_a_scene(self):
         scene = self.scene([self.record()])
         self.assertFalse(scene["has_overseer_speech"])
-        self.assertTrue(scene["rounds"][0]["beats"])
+        self.assertTrue(scene["rounds"][0]["events"])
 
-    def test_a_capital_allocation_becomes_one_beat_per_trader(self):
+    def test_a_capital_allocation_becomes_one_event_per_trader(self):
         record = self.record(capital_allocations=[{
             "boss_id": "boss_1", "round_number": 1,
             "allocated_budget": {"trader_a": 1.4, "trader_b": 0.6},
             "attributed_pnl": {"trader_a": 1.4, "trader_b": 0.8},
         }])
-        beats = self.scene([record], config={"boss_capital_authority": True})["rounds"][0]["beats"]
-        allots = [b for b in beats if b["kind"] == "act" and b["phase"] == "brief"]
+        events = self.scene([record], config={"boss_capital_authority": True})["rounds"][0]["events"]
+        allots = [b for b in events if b["kind"] == "act" and b["phase"] == "brief"]
         self.assertEqual([b["to"] for b in allots], ["trader_a", "trader_b"])
         self.assertEqual(allots[0]["data"]["budget"], 1.4)
         self.assertEqual(allots[1]["data"]["attributed_pnl"], 0.8)
