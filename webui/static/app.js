@@ -1,4 +1,4 @@
-/* LLM-OrgSim control desk.
+/* Language-Action Decoupling control desk.
  *
  * Vanilla DOM, no framework and no build step, for the same reason the server
  * is stdlib-only: this repo's simulator runs on a bare checkout and the desk
@@ -44,6 +44,98 @@ const el = (tag, props = {}, children = []) => {
   }
   return node;
 };
+
+/* An info circle: a "?" token that opens a small parchment note.
+ *
+ * The explanations used to sit inline -- a blurb under the command grid, a
+ * hint under every field, a note under the arm picker -- which put several
+ * paragraphs on screen at once and pushed the controls down past them. The
+ * text itself has not moved: it still comes from webui/commands.py and
+ * webui/floorplan.py over the same `blurb` and `help` fields. Only its
+ * presentation is here.
+ *
+ * The note is position: fixed and placed against the dot's viewport rect
+ * rather than absolutely positioned inside it. Every column on this page
+ * scrolls, and a box with overflow on one axis clips on both, so an absolute
+ * note would be cut off at the column edge.
+ *
+ * What deliberately did NOT move behind a dot: errors, empty states and the
+ * console. Those are status, not explanation, and a status you have to click
+ * for is a status nobody reads.
+ */
+let openInfo = null;
+
+function closeInfo() {
+  if (!openInfo) return;
+  openInfo.pop.remove();
+  openInfo.dot.setAttribute('aria-expanded', 'false');
+  openInfo = null;
+}
+
+function placeInfo(dot, pop) {
+  const margin = 8;
+  const rect = dot.getBoundingClientRect();
+  document.body.append(pop);
+  const box = pop.getBoundingClientRect();
+
+  let left = rect.left - 6;
+  if (left + box.width > window.innerWidth - margin) left = window.innerWidth - margin - box.width;
+  if (left < margin) left = margin;
+
+  // Below the dot by default, flipped above it when there is no room -- the
+  // fields near the bottom of a column are the ones with the longest help.
+  let top = rect.bottom + 7;
+  if (top + box.height > window.innerHeight - margin) top = Math.max(margin, rect.top - 7 - box.height);
+
+  pop.style.left = `${Math.round(left)}px`;
+  pop.style.top = `${Math.round(top)}px`;
+}
+
+function infoDot(text, about) {
+  if (!text) return null;
+  const dot = el('button', {
+    type: 'button',
+    class: 'info-dot',
+    'aria-expanded': 'false',
+    'aria-label': about ? `About ${about}` : 'More information',
+    text: '?',
+  });
+
+  const show = () => {
+    if (openInfo && openInfo.dot === dot) return;
+    closeInfo();
+    const pop = el('div', { class: 'info-pop', role: 'tooltip', text });
+    openInfo = { dot, pop };
+    dot.setAttribute('aria-expanded', 'true');
+    placeInfo(dot, pop);
+  };
+
+  // Hover opens it, click pins it. Several of these dots sit inside a <label>
+  // that would otherwise toggle a checkbox, hence preventDefault, and inside
+  // the document-level close handler, hence stopPropagation.
+  dot.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (openInfo && openInfo.dot === dot) closeInfo();
+    else show();
+  });
+  dot.addEventListener('mouseenter', show);
+  dot.addEventListener('focus', show);
+  dot.addEventListener('mouseleave', () => {
+    // A pinned note stays put while it is being read; only a hover that
+    // wandered off closes itself.
+    if (openInfo && openInfo.dot === dot && !dot.matches(':focus')) closeInfo();
+  });
+
+  return el('span', { class: 'info' }, [dot]);
+}
+
+document.addEventListener('click', closeInfo);
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeInfo(); });
+window.addEventListener('resize', closeInfo);
+// Capture phase: the columns scroll, not the document, and a scroll event on
+// a column does not bubble.
+document.addEventListener('scroll', closeInfo, true);
 
 async function api(path, options) {
   const response = await fetch(path, options);
@@ -101,9 +193,14 @@ function renderCommands() {
     }));
   }
   const command = currentCommand();
-  $('command-blurb').textContent = command
-    ? command.blurb + (command.live ? '  [calls the model]' : '')
-    : '';
+  // What the command does moved into an info circle. What stays on the line
+  // is the name of what is selected and, for the commands that spend provider
+  // tokens, the one warning nobody should have to click to find.
+  $('command-blurb').replaceChildren(...(command ? [
+    el('span', { class: 'label-text', text: command.label }),
+    command.live ? el('span', { class: 'chip warn', text: 'calls the model' }) : null,
+    infoDot(command.blurb, command.label),
+  ].filter(Boolean) : []));
 }
 
 const currentCommand = () => state.commands.find((item) => item.name === state.command) || null;
@@ -212,7 +309,12 @@ function renderField(command, field, values) {
   const help = values.boss_capital_authority && field.setup_b_help
     ? field.setup_b_help
     : field.help;
-  if (help) wrap.append(el('div', { class: 'hint', text: help }));
+  // The help hangs off the field's own label, so a form of eight fields is
+  // eight rows rather than eight paragraphs.
+  if (help) {
+    label.classList.add('label-row');
+    label.append(infoDot(help, field.label));
+  }
   return wrap;
 }
 
@@ -321,8 +423,7 @@ function booleanField(command, field, values) {
     input,
     el('span', { class: 'switch', 'aria-hidden': 'true' }),
     el('span', { class: 'switch-label' }, [
-      field.label,
-      field.help ? el('span', { class: 'hint', text: field.help }) : null,
+      el('span', { class: 'label-row' }, [field.label, infoDot(field.help, field.label)]),
     ]),
   ]);
 }
@@ -346,10 +447,15 @@ function armField(command, field, values) {
     }));
   }
 
+  // The chosen arm's definition rides in a circle on the label. Picking an
+  // arm re-renders the form, so the note behind the dot always describes the
+  // arm that is actually set.
   return el('div', { class: 'field' }, [
-    el('label', {}, [field.label]),
+    el('label', { class: 'label-row' }, [
+      field.label,
+      chosen ? infoDot(chosen.note, chosen.label) : null,
+    ]),
     buttons,
-    el('div', { class: 'arm-note', text: chosen ? chosen.note : '' }),
   ]);
 }
 
@@ -653,6 +759,13 @@ function renderSweepDetail(box, detail) {
     stat('Incomplete', failed, failed ? 'bad' : ''),
   ]));
 
+  // The table had no caption and a paragraph of methodology underneath it.
+  // Now it has a caption, and the methodology is behind the caption's circle.
+  box.append(el('div', { class: 'label-row' }, [
+    el('span', { class: 'label-text', text: 'Rates by pressure' }),
+    infoDot('Rates are over trader-rounds, recomputed from rounds.jsonl. The significance tests live in experiments.report.', 'these rates'),
+  ]));
+
   box.append(el('table', { class: 'data' }, [
     el('thead', {}, [el('tr', {}, ['press', 'eps', 'rounds', 'withheld', 'costly', 'misrep']
       .map((head) => el('th', { text: head })))]),
@@ -665,8 +778,6 @@ function renderSweepDetail(box, detail) {
       el('td', { class: row.misreported ? 'bad' : '', text: percent(row.misreported_rate) }),
     ]))),
   ]));
-  box.append(el('div', { class: 'note-line', text: 'Rates are over trader-rounds, recomputed from rounds.jsonl. The significance tests live in experiments.report.' }));
-
   box.append(el('div', { class: 'button-row' }, [
     el('button', { class: 'small', type: 'button', text: 'Report', onclick: () => prefill('report', { sweep: state.run }) }),
     el('button', { class: 'small', type: 'button', text: 'Findings', onclick: () => prefill('findings', { control: state.run }) }),

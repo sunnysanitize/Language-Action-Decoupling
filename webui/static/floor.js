@@ -48,10 +48,10 @@
       wall: 22,
       tile: 12,
       seats: {
-        ken_griffin: { x: 120, y: 36, body: 'suit', desk: 26, label: 'above' },
-        boss_1: { x: 120, y: 88, body: 'suit', desk: 26, label: 'above' },
-        trader_a: { x: 44, y: 138, body: 'desk', desk: 28, label: 'below' },
-        trader_b: { x: 196, y: 138, body: 'desk', desk: 28, label: 'below' },
+        ken_griffin: { x: 120, y: 36, body: 'founder', desk: 26, screens: 1, label: 'above' },
+        boss_1: { x: 120, y: 88, body: 'boss', desk: 26, screens: 1, label: 'above' },
+        trader_a: { x: 44, y: 138, body: 'trader_a', desk: 28, screens: 2, label: 'below' },
+        trader_b: { x: 196, y: 138, body: 'trader_b', desk: 28, screens: 2, label: 'below' },
       },
     },
     {
@@ -60,10 +60,10 @@
       wall: 16,
       tile: 12,
       seats: {
-        ken_griffin: { x: 220, y: 36, body: 'suit', desk: 30, label: 'above' },
-        boss_1: { x: 220, y: 78, body: 'suit', desk: 30, label: 'above' },
-        trader_a: { x: 64, y: 120, body: 'desk', desk: 34, label: 'below' },
-        trader_b: { x: 376, y: 120, body: 'desk', desk: 34, label: 'below' },
+        ken_griffin: { x: 220, y: 36, body: 'founder', desk: 30, screens: 1, label: 'above' },
+        boss_1: { x: 220, y: 78, body: 'boss', desk: 30, screens: 1, label: 'above' },
+        trader_a: { x: 64, y: 120, body: 'trader_a', desk: 34, screens: 2, label: 'below' },
+        trader_b: { x: 376, y: 120, body: 'trader_b', desk: 34, screens: 2, label: 'below' },
       },
     },
   ];
@@ -90,27 +90,43 @@
     ['trader_a', 'trader_b'],
   ];
 
+  /* The room is deliberately the darkest, least saturated thing on the page:
+   * a slate room with slate furniture. It is a backdrop for the wires, and
+   * the wires are the measurement. A saturated Okabe-Ito value sits in the
+   * same lightness band as a mid grey, so a mid-grey room would swallow them
+   * -- keeping the floor well below all six is what lets them read as marks.
+   *
+   * Same geometry as before; only the pigment changed. */
   const COLORS = {
-    wall: '#221f33',
-    wallTrim: '#4a4a6a',
-    wallDark: '#191527',
-    carpet: '#2a2a3a',
-    carpetAccent: '#24243333',
-    deskTop: '#5a4230',
-    deskSide: '#3d2c20',
-    deskEdge: '#0a0a14',
-    wire: '#3a3a55',
-    wireLive: '#746fff',
-    platform: '#2f2b44',
+    wall: '#1b3050',
+    wallTrim: '#3d5980',
+    wallDark: '#132540',
+    carpet: '#0f1e33',
+    carpetAccent: '#1b305066',
+    deskTop: '#2a4266',
+    deskSide: '#1e3252',
+    deskEdge: '#010306',
+    wire: '#3d5980',
+    wireLive: '#5aa9e6',
+    platform: '#1b3050',
   };
 
+  /* Six phases, six categories -- the one place a colour is spent purely to
+   * be told apart from five others, because here the hue IS the information:
+   * which phase a wire is carrying.
+   *
+   * Five are Okabe-Ito members; market is the palette's neutral, which suits
+   * it -- the market is the only one of the six that is not an agent saying
+   * something. Orange and vermillion are adjacent in hue on purpose: the
+   * palette separates that pair by lightness (0.42 against 0.18), which is
+   * the discriminator that survives both a 5px wire and a colourblind eye. */
   const PHASE_TINT = {
-    brief: '#6030ff',
-    signal: '#3794ff',
-    share: '#cca700',
-    trade: '#89d185',
-    report: '#ff8d14',
-    market: '#d14249',
+    brief: '#cc79a7',
+    signal: '#56b4e9',
+    share: '#e69f00',
+    trade: '#3fd1a4',
+    report: '#e2661f',
+    market: '#cddaeb',
   };
 
   class FloorView {
@@ -565,7 +581,19 @@
       ctx.fillStyle = COLORS.deskSide;
       ctx.fillRect(px(seat.x - half), px(seat.y + 6), px(half * 2), px(7));
 
-      drawSprite(ctx, MONITOR, PROP_PALETTE, px(seat.x + half - 18), px(seat.y - 6), scale, 0.9);
+      // Screens, drawn after the desk so they stand on it. A trader runs two
+      // and the two supervisors run one, which is the org chart in furniture:
+      // the desk reads markets, the people above it read summaries.
+      //
+      // Two screens go to the ends of the desk rather than side by side. The
+      // body is 16 wide and centred on seat.x, so anything closer to the
+      // middle than half-18 is drawn across the person's chest.
+      const monitorX = seat.screens === 2
+        ? [seat.x - half + 2, seat.x + half - 18]
+        : [seat.x + half - 18];
+      for (const x of monitorX) {
+        drawSprite(ctx, MONITOR, PROP_PALETTE, px(x), px(seat.y - 6), scale, 0.9);
+      }
 
       // A ring on the floor marks whoever is acting right now -- the same job
       // the pulsing LED does in the jobs list.
@@ -584,7 +612,7 @@
       const reached = roundEvent && ['market'].includes(roundEvent.phase);
       const direction = round.world.market_direction;
 
-      ctx.fillStyle = '#12121e';
+      ctx.fillStyle = '#010306';
       const stage = this.layout.stage;
       ctx.fillRect(0, px(stage.h - 12), px(stage.w), px(12));
       ctx.fillStyle = COLORS.wallTrim;
@@ -594,7 +622,7 @@
       // during the share phase would hand the viewer information no agent had.
       const cells = 28;
       for (let index = 0; index < cells; index += 1) {
-        ctx.fillStyle = !reached ? '#2a2a3a' : (direction > 0 ? '#89d185' : '#d14249');
+        ctx.fillStyle = !reached ? '#3d5980' : (direction > 0 ? '#3fd1a4' : '#e2661f');
         const height = !reached ? 1 : (direction > 0 ? 2 + (index % 4) : 2 + ((cells - index) % 4));
         ctx.fillRect(px(4 + index * 8), px(stage.h - 4 - height), px(5), px(height));
       }

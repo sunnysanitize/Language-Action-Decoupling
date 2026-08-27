@@ -1,4 +1,9 @@
-# Run LLM-OrgSim locally
+# Run Language-Action Decoupling locally
+
+Code for the paper *Language-Action Decoupling: Speech as a Weak Proxy
+for Action in LLM Hierarchies*.
+
+Paper: not yet released — link to be added here.
 
 ## Requirements
 
@@ -11,7 +16,7 @@ Open a terminal in the project directory, then run:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m marketarena.market
+python -m environment.market
 pip install -r requirements.txt
 ```
 
@@ -22,7 +27,7 @@ Open PowerShell in the project directory, then run:
 ```powershell
 py -m venv .venv
 .venv\Scripts\Activate.ps1
-py -m marketarena.market
+py -m environment.market
 pip install -r requirements.txt
 ```
 
@@ -55,14 +60,14 @@ On macOS or Linux:
 
 ```bash
 source .venv/bin/activate
-python -m marketarena.market
+python -m environment.market
 ```
 
 On Windows:
 
 ```powershell
 .venv\Scripts\Activate.ps1
-py -m marketarena.market
+py -m environment.market
 ```
 
 ## The control desk (browser front end)

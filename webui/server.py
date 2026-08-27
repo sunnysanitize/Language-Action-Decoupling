@@ -133,7 +133,7 @@ def loads_env_report() -> dict:
 
 
 class DeskHandler(BaseHTTPRequestHandler):
-    server_version = "LLMOrgSimDesk/1.0"
+    server_version = "LanguageActionDecouplingDesk/1.0"
     protocol_version = "HTTP/1.1"
     quiet = False
 
@@ -407,7 +407,7 @@ class DeskServer(ThreadingHTTPServer):
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Serve the LLM-OrgSim control desk on localhost."
+        description="Serve the Language-Action Decoupling control desk on localhost."
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
@@ -440,7 +440,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     host, port = server.server_address[0], server.server_address[1]
     url = f"http://{host}:{port}/"
     report = loads_env_report()
-    print(f"LLM-OrgSim control desk on {url}")
+    print(f"Language-Action Decoupling control desk on {url}")
     print(f"  project     {PROJECT_ROOT}")
     print(f"  interpreter {sys.executable}")
     print(f"  model       {report['model'] or '(unset)'}")

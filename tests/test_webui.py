@@ -422,7 +422,7 @@ class ServerTests(unittest.TestCase):
 
     def test_the_page_and_its_assets_are_served(self):
         for path, needle in (
-            ("/", b"LLM-OrgSim"),
+            ("/", b"Language-Action Decoupling"),
             ("/static/style.css", b"--color-accent"),
             ("/static/app.js", b"api/jobs"),
         ):
